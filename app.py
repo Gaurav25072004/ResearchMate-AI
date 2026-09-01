@@ -2,6 +2,11 @@ import streamlit as st
 
 from rag.pdf_loader import extract_text_from_pdf
 
+from rag.text_processor import (
+    clean_text,
+    split_text_into_chunks
+)
+
 
 # ============================================================
 # PAGE CONFIGURATION
@@ -65,11 +70,13 @@ if page == "🏠 Home":
         "to understand, analyze, and improve your research."
     )
 
+
     # --------------------------------------------------------
     # FEATURE CARDS - ROW 1
     # --------------------------------------------------------
 
     col1, col2, col3 = st.columns(3)
+
 
     with col1:
 
@@ -80,6 +87,7 @@ if page == "🏠 Home":
             "information from academic documents."
         )
 
+
     with col2:
 
         st.subheader("🧭 Potential Research Directions")
@@ -88,6 +96,7 @@ if page == "🏠 Home":
             "Suggest potential research directions by analyzing "
             "existing research literature."
         )
+
 
     with col3:
 
@@ -98,11 +107,13 @@ if page == "🏠 Home":
             "research papers."
         )
 
+
     # --------------------------------------------------------
     # FEATURE CARDS - ROW 2
     # --------------------------------------------------------
 
     col4, col5, col6 = st.columns(3)
+
 
     with col4:
 
@@ -113,6 +124,7 @@ if page == "🏠 Home":
             "of a research proposal."
         )
 
+
     with col5:
 
         st.subheader("📊 Research Score")
@@ -121,6 +133,7 @@ if page == "🏠 Home":
             "Evaluate research quality using multiple "
             "research-related criteria."
         )
+
 
     with col6:
 
@@ -141,11 +154,12 @@ elif page == "📄 Paper Analysis":
     st.title("📄 Research Paper Analysis")
 
     st.write(
-        "Upload a research paper in PDF format to extract "
-        "and analyze its text."
+        "Upload a research paper in PDF format to extract, "
+        "clean, and prepare its text for further analysis."
     )
 
     st.markdown("---")
+
 
     # --------------------------------------------------------
     # PDF UPLOAD
@@ -157,6 +171,7 @@ elif page == "📄 Paper Analysis":
         help="Upload a research paper in PDF format."
     )
 
+
     # --------------------------------------------------------
     # PROCESS PDF
     # --------------------------------------------------------
@@ -167,13 +182,39 @@ elif page == "📄 Paper Analysis":
             f"✅ Successfully uploaded: {uploaded_file.name}"
         )
 
-        with st.spinner("📖 Extracting text from PDF..."):
+
+        with st.spinner(
+            "📖 Extracting and processing PDF..."
+        ):
 
             try:
 
-                text, page_count = extract_text_from_pdf(
+                # ------------------------------------------------
+                # STEP 1: EXTRACT RAW TEXT
+                # ------------------------------------------------
+
+                raw_text, page_count = extract_text_from_pdf(
                     uploaded_file
                 )
+
+
+                # ------------------------------------------------
+                # STEP 2: CLEAN TEXT
+                # ------------------------------------------------
+
+                text = clean_text(raw_text)
+
+
+                # ------------------------------------------------
+                # STEP 3: CREATE TEXT CHUNKS
+                # ------------------------------------------------
+
+                chunks = split_text_into_chunks(
+                    text,
+                    chunk_size=1500,
+                    chunk_overlap=200
+                )
+
 
                 # ------------------------------------------------
                 # PAPER INFORMATION
@@ -183,7 +224,9 @@ elif page == "📄 Paper Analysis":
 
                 st.subheader("📋 Paper Information")
 
-                col1, col2, col3 = st.columns(3)
+
+                col1, col2, col3, col4 = st.columns(4)
+
 
                 with col1:
 
@@ -192,12 +235,14 @@ elif page == "📄 Paper Analysis":
                         uploaded_file.name
                     )
 
+
                 with col2:
 
                     st.metric(
                         "📑 Pages",
                         page_count
                     )
+
 
                 with col3:
 
@@ -206,38 +251,86 @@ elif page == "📄 Paper Analysis":
                         len(text)
                     )
 
+
+                with col4:
+
+                    st.metric(
+                        "🧩 Chunks",
+                        len(chunks)
+                    )
+
+
                 # ------------------------------------------------
-                # EXTRACTED TEXT
+                # EXTRACTED / CLEANED TEXT
                 # ------------------------------------------------
 
                 st.markdown("---")
 
                 st.subheader("📄 Extracted Text")
 
+
                 if text.strip():
 
                     st.text_area(
-                        "Text extracted from the research paper:",
+                        "Cleaned text extracted from the "
+                        "research paper:",
                         text,
                         height=500
                     )
 
+
                 else:
 
                     st.warning(
-                        "⚠️ No text could be extracted from this PDF."
+                        "⚠️ No text could be extracted from "
+                        "this PDF."
                     )
 
                     st.write(
-                        "The PDF may contain scanned images instead "
-                        "of selectable text. OCR support can be added "
-                        "later."
+                        "The PDF may contain scanned images "
+                        "instead of selectable text. OCR "
+                        "support can be added later."
                     )
+
+
+                # ------------------------------------------------
+                # TEXT CHUNKS
+                # ------------------------------------------------
+
+                if chunks:
+
+                    st.markdown("---")
+
+                    st.subheader("🧩 Text Chunks")
+
+                    st.write(
+                        f"The research paper has been divided "
+                        f"into {len(chunks)} overlapping chunks "
+                        "for future RAG processing."
+                    )
+
+
+                    for i, chunk in enumerate(chunks):
+
+                        with st.expander(
+                            f"Chunk {i + 1}"
+                        ):
+
+                            st.write(chunk)
+
+
+                else:
+
+                    st.warning(
+                        "⚠️ No text chunks were generated."
+                    )
+
 
             except Exception as e:
 
                 st.error(
-                    "❌ An error occurred while processing the PDF."
+                    "❌ An error occurred while processing "
+                    "the PDF."
                 )
 
                 st.exception(e)
@@ -249,7 +342,9 @@ elif page == "📄 Paper Analysis":
 
 elif page == "🧭 Potential Research Directions":
 
-    st.title("🧭 Potential Research Directions")
+    st.title(
+        "🧭 Potential Research Directions"
+    )
 
     st.info(
         "🚧 Research Direction Agent will be implemented "
@@ -267,9 +362,9 @@ elif page == "🧭 Potential Research Directions":
     st.subheader("How It Will Work")
 
     st.write(
-        "The system will analyze information from the available "
-        "research literature, including limitations, future work, "
-        "underexplored areas, and related findings."
+        "The system will analyze information from available "
+        "research literature, including limitations, future "
+        "work, underexplored areas, and related findings."
     )
 
     st.write(
