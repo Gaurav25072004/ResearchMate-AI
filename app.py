@@ -27,7 +27,7 @@ page = st.sidebar.radio(
     [
         "🏠 Home",
         "📄 Paper Analysis",
-        "🔎 Research Gap",
+        "🧭 Potential Research Directions",
         "📚 Citation Analysis",
         "💡 Novelty Analysis",
         "📊 Research Score"
@@ -48,8 +48,8 @@ if page == "🏠 Home":
     st.write(
         "ResearchMate AI is an intelligent research assistant "
         "designed to help students and researchers analyze "
-        "research papers, identify research gaps, verify citations, "
-        "and evaluate research proposals."
+        "research papers, explore potential research directions, "
+        "analyze citations, and evaluate research proposals."
     )
 
     st.info(
@@ -82,10 +82,10 @@ if page == "🏠 Home":
 
     with col2:
 
-        st.subheader("🔎 Research Gap")
+        st.subheader("🧭 Potential Research Directions")
 
         st.write(
-            "Identify potential research gaps by analyzing "
+            "Suggest potential research directions by analyzing "
             "existing research literature."
         )
 
@@ -244,20 +244,44 @@ elif page == "📄 Paper Analysis":
 
 
 # ============================================================
-# RESEARCH GAP PAGE
+# POTENTIAL RESEARCH DIRECTIONS PAGE
 # ============================================================
 
-elif page == "🔎 Research Gap":
+elif page == "🧭 Potential Research Directions":
 
-    st.title("🔎 Research Gap Analysis")
+    st.title("🧭 Potential Research Directions")
 
     st.info(
-        "🚧 Research Gap Agent will be implemented in a later phase."
+        "🚧 Research Direction Agent will be implemented "
+        "in a later phase."
     )
 
     st.write(
         "This module will analyze research literature and "
-        "identify potential research gaps."
+        "suggest potential research directions for further "
+        "investigation."
+    )
+
+    st.markdown("---")
+
+    st.subheader("How It Will Work")
+
+    st.write(
+        "The system will analyze information from the available "
+        "research literature, including limitations, future work, "
+        "underexplored areas, and related findings."
+    )
+
+    st.write(
+        "Based on this analysis, ResearchMate AI will suggest "
+        "potential research directions that researchers can "
+        "investigate further."
+    )
+
+    st.warning(
+        "⚠️ These are AI-generated suggestions and should be "
+        "validated by the researcher using domain knowledge "
+        "and further literature review."
     )
 
 
@@ -294,8 +318,8 @@ elif page == "💡 Novelty Analysis":
     )
 
     st.write(
-        "This module will compare research ideas with "
-        "existing literature to estimate potential novelty."
+        "This module will evaluate the potential novelty "
+        "and contribution of a research proposal."
     )
 
 
@@ -314,7 +338,7 @@ elif page == "📊 Research Score":
 
     st.write(
         "This module will evaluate research quality using "
-        "multiple research criteria."
+        "multiple research-related criteria."
     )
 
 
