@@ -7,10 +7,31 @@ from rag.text_processor import (
     split_text_into_chunks
 )
 
+from rag.embedding import (
+    load_embedding_model,
+    generate_embeddings
+)
 
-# ============================================================
-# PAGE CONFIGURATION
-# ============================================================
+
+# --------------------------------------------------
+# Embedding Model Cache
+# --------------------------------------------------
+
+@st.cache_resource
+def get_embedding_model():
+    """
+    Load and cache the embedding model.
+
+    Streamlit reruns the application whenever the user
+    interacts with the UI. Caching prevents the model
+    from being loaded repeatedly.
+    """
+    return load_embedding_model()
+
+
+# --------------------------------------------------
+# Page Configuration
+# --------------------------------------------------
 
 st.set_page_config(
     page_title="ResearchMate AI",
@@ -19,16 +40,20 @@ st.set_page_config(
 )
 
 
-# ============================================================
-# SIDEBAR NAVIGATION
-# ============================================================
+# --------------------------------------------------
+# Sidebar Navigation
+# --------------------------------------------------
 
 st.sidebar.title("📚 ResearchMate AI")
 
-st.sidebar.write("### Navigation")
+st.sidebar.write(
+    "AI-powered research assistant for literature analysis."
+)
+
+st.sidebar.divider()
 
 page = st.sidebar.radio(
-    "Select Module",
+    "Navigate",
     [
         "🏠 Home",
         "📄 Paper Analysis",
@@ -40,408 +65,373 @@ page = st.sidebar.radio(
 )
 
 
-# ============================================================
-# HOME PAGE
-# ============================================================
+# --------------------------------------------------
+# Home Page
+# --------------------------------------------------
 
 if page == "🏠 Home":
 
     st.title("📚 ResearchMate AI")
 
-    st.subheader("AI-Powered Research Assistant")
+    st.subheader(
+        "AI-Powered Research Assistant"
+    )
 
     st.write(
-        "ResearchMate AI is an intelligent research assistant "
-        "designed to help students and researchers analyze "
-        "research papers, explore potential research directions, "
-        "analyze citations, and evaluate research proposals."
+        """
+        ResearchMate AI helps students and researchers
+        analyze research papers and understand existing
+        literature using Artificial Intelligence.
+        """
     )
 
-    st.info(
-        "🚧 ResearchMate AI is currently under development."
-    )
-
-    st.markdown("---")
-
-    st.header("Welcome to ResearchMate AI")
-
-    st.write(
-        "Upload your research papers and use AI-powered tools "
-        "to understand, analyze, and improve your research."
-    )
-
-
-    # --------------------------------------------------------
-    # FEATURE CARDS - ROW 1
-    # --------------------------------------------------------
+    st.divider()
 
     col1, col2, col3 = st.columns(3)
 
-
     with col1:
-
         st.subheader("📄 Paper Analysis")
-
         st.write(
-            "Analyze research papers and extract important "
-            "information from academic documents."
+            "Upload and analyze research papers using "
+            "automated text processing."
         )
-
 
     with col2:
-
         st.subheader("🧭 Potential Research Directions")
-
         st.write(
-            "Suggest potential research directions by analyzing "
-            "existing research literature."
+            "Suggest potential research directions by "
+            "analyzing existing research literature."
         )
-
 
     with col3:
-
         st.subheader("📚 Citation Analysis")
-
         st.write(
-            "Analyze references and citations used in "
-            "research papers."
+            "Analyze citation information and research "
+            "references."
         )
-
-
-    # --------------------------------------------------------
-    # FEATURE CARDS - ROW 2
-    # --------------------------------------------------------
 
     col4, col5, col6 = st.columns(3)
 
-
     with col4:
-
         st.subheader("💡 Novelty Analysis")
-
         st.write(
-            "Evaluate the potential novelty and contribution "
-            "of a research proposal."
+            "Analyze research content to provide insights "
+            "about potentially novel aspects."
         )
-
 
     with col5:
-
         st.subheader("📊 Research Score")
-
         st.write(
-            "Evaluate research quality using multiple "
-            "research-related criteria."
+            "Generate an overall research-oriented score "
+            "based on multiple analysis factors."
         )
-
 
     with col6:
-
-        st.subheader("🤖 AI Assistant")
-
+        st.subheader("🤖 AI Research Assistant")
         st.write(
-            "Interact with an AI assistant using "
-            "Retrieval-Augmented Generation."
+            "Use AI-powered retrieval and analysis to "
+            "support research exploration."
         )
 
 
-# ============================================================
-# PAPER ANALYSIS PAGE
-# ============================================================
+# --------------------------------------------------
+# Paper Analysis
+# --------------------------------------------------
 
 elif page == "📄 Paper Analysis":
 
     st.title("📄 Research Paper Analysis")
 
     st.write(
-        "Upload a research paper in PDF format to extract, "
-        "clean, and prepare its text for further analysis."
+        """
+        Upload a research paper to extract, clean,
+        split, and convert its content into numerical
+        vector representations.
+        """
     )
 
-    st.markdown("---")
-
-
-    # --------------------------------------------------------
-    # PDF UPLOAD
-    # --------------------------------------------------------
+    st.divider()
 
     uploaded_file = st.file_uploader(
-        "Upload Research Paper",
-        type=["pdf"],
-        help="Upload a research paper in PDF format."
+        "Upload a research paper",
+        type=["pdf"]
     )
-
-
-    # --------------------------------------------------------
-    # PROCESS PDF
-    # --------------------------------------------------------
 
     if uploaded_file is not None:
 
         st.success(
-            f"✅ Successfully uploaded: {uploaded_file.name}"
+            f"Uploaded successfully: {uploaded_file.name}"
         )
 
+        # --------------------------------------------------
+        # Step 1: Extract Text
+        # --------------------------------------------------
+
+        raw_text, page_count = extract_text_from_pdf(
+            uploaded_file
+        )
+
+        # --------------------------------------------------
+        # Step 2: Clean Text
+        # --------------------------------------------------
+
+        text = clean_text(raw_text)
+
+        # --------------------------------------------------
+        # Step 3: Split Text into Chunks
+        # --------------------------------------------------
+
+        chunks = split_text_into_chunks(
+            text,
+            chunk_size=1500,
+            chunk_overlap=200
+        )
+
+        # --------------------------------------------------
+        # Step 4: Generate Embeddings
+        # --------------------------------------------------
 
         with st.spinner(
-            "📖 Extracting and processing PDF..."
+            "Generating embeddings for the research paper..."
         ):
 
-            try:
+            embedding_model = get_embedding_model()
 
-                # ------------------------------------------------
-                # STEP 1: EXTRACT RAW TEXT
-                # ------------------------------------------------
+            embeddings = generate_embeddings(
+                chunks,
+                embedding_model
+            )
 
-                raw_text, page_count = extract_text_from_pdf(
-                    uploaded_file
-                )
+        st.divider()
 
+        # --------------------------------------------------
+        # Paper Statistics
+        # --------------------------------------------------
 
-                # ------------------------------------------------
-                # STEP 2: CLEAN TEXT
-                # ------------------------------------------------
+        col1, col2, col3, col4, col5 = st.columns(5)
 
-                text = clean_text(raw_text)
+        with col1:
+            st.metric(
+                "File Name",
+                uploaded_file.name
+            )
 
+        with col2:
+            st.metric(
+                "Pages",
+                page_count
+            )
 
-                # ------------------------------------------------
-                # STEP 3: CREATE TEXT CHUNKS
-                # ------------------------------------------------
+        with col3:
+            st.metric(
+                "Characters",
+                len(text)
+            )
 
-                chunks = split_text_into_chunks(
-                    text,
-                    chunk_size=1500,
-                    chunk_overlap=200
-                )
+        with col4:
+            st.metric(
+                "Chunks",
+                len(chunks)
+            )
 
+        with col5:
 
-                # ------------------------------------------------
-                # PAPER INFORMATION
-                # ------------------------------------------------
+            embedding_dimension = (
+                embeddings.shape[1]
+                if len(embeddings) > 0
+                else 0
+            )
 
-                st.markdown("---")
+            st.metric(
+                "Embedding Dimension",
+                embedding_dimension
+            )
 
-                st.subheader("📋 Paper Information")
+        # --------------------------------------------------
+        # Embedding Status
+        # --------------------------------------------------
 
+        if len(embeddings) > 0:
 
-                col1, col2, col3, col4 = st.columns(4)
+            st.success(
+                f"Successfully generated "
+                f"{len(embeddings)} embeddings "
+                f"with {embeddings.shape[1]} dimensions each."
+            )
 
+        else:
 
-                with col1:
+            st.warning(
+                "No embeddings were generated because "
+                "no text chunks were available."
+            )
 
-                    st.metric(
-                        "📄 File Name",
-                        uploaded_file.name
-                    )
+        st.divider()
 
+        # --------------------------------------------------
+        # Cleaned Text
+        # --------------------------------------------------
 
-                with col2:
+        st.subheader("🧹 Cleaned Text")
 
-                    st.metric(
-                        "📑 Pages",
-                        page_count
-                    )
+        st.text_area(
+            "Processed research paper text",
+            text,
+            height=400
+        )
 
+        # --------------------------------------------------
+        # Text Chunks
+        # --------------------------------------------------
 
-                with col3:
+        st.subheader("🧩 Text Chunks")
 
-                    st.metric(
-                        "🔤 Characters",
-                        len(text)
-                    )
+        st.write(
+            f"The paper has been divided into "
+            f"**{len(chunks)} overlapping chunks** "
+            f"for further analysis."
+        )
 
+        for i, chunk in enumerate(chunks):
 
-                with col4:
+            with st.expander(
+                f"Chunk {i + 1}"
+            ):
 
-                    st.metric(
-                        "🧩 Chunks",
-                        len(chunks)
-                    )
+                st.write(chunk)
 
+        # --------------------------------------------------
+        # Embedding Preview
+        # --------------------------------------------------
 
-                # ------------------------------------------------
-                # EXTRACTED / CLEANED TEXT
-                # ------------------------------------------------
+        st.subheader("🔢 Embedding Preview")
 
-                st.markdown("---")
+        if len(embeddings) > 0:
 
-                st.subheader("📄 Extracted Text")
+            st.write(
+                """
+                Each text chunk has been converted into
+                a numerical vector using the
+                `all-MiniLM-L6-v2` embedding model.
+                """
+            )
 
+            st.write(
+                f"Total embeddings: **{len(embeddings)}**"
+            )
 
-                if text.strip():
+            st.write(
+                f"Vector dimensions: **{embeddings.shape[1]}**"
+            )
 
-                    st.text_area(
-                        "Cleaned text extracted from the "
-                        "research paper:",
-                        text,
-                        height=500
-                    )
+            st.write(
+                "First embedding vector (first 10 values):"
+            )
 
-
-                else:
-
-                    st.warning(
-                        "⚠️ No text could be extracted from "
-                        "this PDF."
-                    )
-
-                    st.write(
-                        "The PDF may contain scanned images "
-                        "instead of selectable text. OCR "
-                        "support can be added later."
-                    )
-
-
-                # ------------------------------------------------
-                # TEXT CHUNKS
-                # ------------------------------------------------
-
-                if chunks:
-
-                    st.markdown("---")
-
-                    st.subheader("🧩 Text Chunks")
-
-                    st.write(
-                        f"The research paper has been divided "
-                        f"into {len(chunks)} overlapping chunks "
-                        "for future RAG processing."
-                    )
-
-
-                    for i, chunk in enumerate(chunks):
-
-                        with st.expander(
-                            f"Chunk {i + 1}"
-                        ):
-
-                            st.write(chunk)
-
-
-                else:
-
-                    st.warning(
-                        "⚠️ No text chunks were generated."
-                    )
-
-
-            except Exception as e:
-
-                st.error(
-                    "❌ An error occurred while processing "
-                    "the PDF."
-                )
-
-                st.exception(e)
+            st.code(
+                str(embeddings[0][:10])
+            )
 
 
-# ============================================================
-# POTENTIAL RESEARCH DIRECTIONS PAGE
-# ============================================================
+# --------------------------------------------------
+# Potential Research Directions
+# --------------------------------------------------
 
 elif page == "🧭 Potential Research Directions":
 
-    st.title(
-        "🧭 Potential Research Directions"
+    st.title("🧭 Potential Research Directions")
+
+    st.write(
+        """
+        This module will analyze research literature
+        and suggest potential research directions
+        for further investigation.
+        """
     )
 
     st.info(
-        "🚧 Research Direction Agent will be implemented "
-        "in a later phase."
-    )
-
-    st.write(
-        "This module will analyze research literature and "
-        "suggest potential research directions for further "
-        "investigation."
-    )
-
-    st.markdown("---")
-
-    st.subheader("How It Will Work")
-
-    st.write(
-        "The system will analyze information from available "
-        "research literature, including limitations, future "
-        "work, underexplored areas, and related findings."
-    )
-
-    st.write(
-        "Based on this analysis, ResearchMate AI will suggest "
-        "potential research directions that researchers can "
-        "investigate further."
+        """
+        This feature will use retrieved research content
+        and AI-based analysis to suggest potentially
+        underexplored areas for further investigation.
+        """
     )
 
     st.warning(
-        "⚠️ These are AI-generated suggestions and should be "
-        "validated by the researcher using domain knowledge "
-        "and further literature review."
+        """
+        ⚠️ These are AI-generated suggestions and should
+        be validated by the researcher using domain
+        knowledge and further literature review.
+        """
     )
 
 
-# ============================================================
-# CITATION ANALYSIS PAGE
-# ============================================================
+# --------------------------------------------------
+# Citation Analysis
+# --------------------------------------------------
 
 elif page == "📚 Citation Analysis":
 
     st.title("📚 Citation Analysis")
 
-    st.info(
-        "🚧 Citation Analysis Agent will be implemented "
-        "in a later phase."
-    )
-
     st.write(
-        "This module will analyze references and citations "
-        "used in research papers."
+        """
+        This module will analyze citations and references
+        from research papers.
+        """
+    )
+
+    st.info(
+        "Citation analysis functionality will be implemented in a future development stage."
     )
 
 
-# ============================================================
-# NOVELTY ANALYSIS PAGE
-# ============================================================
+# --------------------------------------------------
+# Novelty Analysis
+# --------------------------------------------------
 
 elif page == "💡 Novelty Analysis":
 
     st.title("💡 Novelty Analysis")
 
-    st.info(
-        "🚧 Novelty Analysis Agent will be implemented "
-        "in a later phase."
-    )
-
     st.write(
-        "This module will evaluate the potential novelty "
-        "and contribution of a research proposal."
+        """
+        This module will analyze research content and
+        provide insights about potentially novel aspects
+        of the research.
+        """
+    )
+
+    st.info(
+        "Novelty analysis functionality will be implemented in a future development stage."
     )
 
 
-# ============================================================
-# RESEARCH SCORE PAGE
-# ============================================================
+# --------------------------------------------------
+# Research Score
+# --------------------------------------------------
 
 elif page == "📊 Research Score":
 
     st.title("📊 Research Score")
 
-    st.info(
-        "🚧 Research Scoring Agent will be implemented "
-        "in a later phase."
-    )
-
     st.write(
-        "This module will evaluate research quality using "
-        "multiple research-related criteria."
+        """
+        This module will generate an overall research
+        score based on multiple analysis factors.
+        """
+    )
+
+    st.info(
+        "Research scoring functionality will be implemented in a future development stage."
     )
 
 
-# ============================================================
-# FOOTER
-# ============================================================
+# --------------------------------------------------
+# Footer
+# --------------------------------------------------
 
-st.markdown("---")
+st.divider()
 
 st.caption(
     "ResearchMate AI | MCA Capstone Project"
