@@ -13,7 +13,8 @@ from rag.embedding import (
 )
 
 from rag.vector_store import (
-    create_faiss_index
+    create_faiss_index,
+    search_faiss_index
 )
 
 
@@ -26,8 +27,9 @@ def get_embedding_model():
     """
     Load and cache the embedding model.
 
-    Caching prevents Streamlit from loading the
-    embedding model repeatedly on every interaction.
+    Streamlit reruns the application whenever the
+    user interacts with the UI. Caching prevents
+    the model from being loaded repeatedly.
     """
     return load_embedding_model()
 
@@ -154,8 +156,8 @@ elif page == "📄 Paper Analysis":
     st.write(
         """
         Upload a research paper to extract, clean,
-        split, embed, and index its content for
-        semantic search.
+        split, embed, index, and retrieve relevant
+        research content.
         """
     )
 
@@ -313,6 +315,96 @@ elif page == "📄 Paper Analysis":
         st.divider()
 
         # --------------------------------------------------
+        # Semantic Retrieval
+        # --------------------------------------------------
+
+        st.subheader("🔎 Semantic Retrieval")
+
+        st.write(
+            """
+            Ask a question about the uploaded research
+            paper. ResearchMate AI will convert the question
+            into an embedding and retrieve the most
+            semantically relevant chunks using FAISS.
+            """
+        )
+
+        query = st.text_input(
+            "Enter your research question",
+            placeholder=(
+                "Example: What methodology was used "
+                "in this research?"
+            )
+        )
+
+        top_k = st.slider(
+            "Number of relevant chunks to retrieve",
+            min_value=1,
+            max_value=10,
+            value=3
+        )
+
+        if query:
+
+            if faiss_index is not None:
+
+                with st.spinner(
+                    "Searching for relevant content..."
+                ):
+
+                    # Generate embedding for user query
+                    query_embedding = embedding_model.encode(
+                        [query]
+                    )
+
+                    # Search FAISS
+                    scores, indices = search_faiss_index(
+                        faiss_index,
+                        query_embedding,
+                        top_k=top_k
+                    )
+
+                st.write(
+                    f"Retrieved **{len(indices)}** "
+                    "relevant chunks."
+                )
+
+                # --------------------------------------------------
+                # Display Retrieved Results
+                # --------------------------------------------------
+
+                for rank, (index_value, score) in enumerate(
+                    zip(indices, scores),
+                    start=1
+                ):
+
+                    st.markdown(
+                        f"### Result {rank}"
+                    )
+
+                    st.write(
+                        f"**Similarity Score:** "
+                        f"{score:.4f}"
+                    )
+
+                    st.write(
+                        f"**Chunk {index_value + 1}**"
+                    )
+
+                    st.info(
+                        chunks[index_value]
+                    )
+
+                    st.divider()
+
+            else:
+
+                st.warning(
+                    "Semantic retrieval is unavailable "
+                    "because the FAISS index was not created."
+                )
+
+        # --------------------------------------------------
         # Cleaned Text
         # --------------------------------------------------
 
@@ -388,9 +480,9 @@ elif page == "📄 Paper Analysis":
             st.write(
                 """
                 FAISS stores the embedding vectors in a
-                searchable index. This index will be used
-                in the next stage for retrieving the most
-                relevant research-paper chunks.
+                searchable index. The index is used to
+                retrieve the most relevant research-paper
+                chunks for a user's query.
                 """
             )
 
@@ -405,8 +497,8 @@ elif page == "📄 Paper Analysis":
             )
 
             st.success(
-                "Research paper embeddings are now "
-                "indexed and ready for semantic retrieval."
+                "Research paper embeddings are indexed "
+                "and ready for semantic retrieval."
             )
 
 
