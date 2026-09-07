@@ -12,6 +12,10 @@ from rag.embedding import (
     generate_embeddings
 )
 
+from rag.vector_store import (
+    create_faiss_index
+)
+
 
 # --------------------------------------------------
 # Embedding Model Cache
@@ -22,9 +26,8 @@ def get_embedding_model():
     """
     Load and cache the embedding model.
 
-    Streamlit reruns the application whenever the user
-    interacts with the UI. Caching prevents the model
-    from being loaded repeatedly.
+    Caching prevents Streamlit from loading the
+    embedding model repeatedly on every interaction.
     """
     return load_embedding_model()
 
@@ -91,6 +94,7 @@ if page == "🏠 Home":
 
     with col1:
         st.subheader("📄 Paper Analysis")
+
         st.write(
             "Upload and analyze research papers using "
             "automated text processing."
@@ -98,6 +102,7 @@ if page == "🏠 Home":
 
     with col2:
         st.subheader("🧭 Potential Research Directions")
+
         st.write(
             "Suggest potential research directions by "
             "analyzing existing research literature."
@@ -105,6 +110,7 @@ if page == "🏠 Home":
 
     with col3:
         st.subheader("📚 Citation Analysis")
+
         st.write(
             "Analyze citation information and research "
             "references."
@@ -114,6 +120,7 @@ if page == "🏠 Home":
 
     with col4:
         st.subheader("💡 Novelty Analysis")
+
         st.write(
             "Analyze research content to provide insights "
             "about potentially novel aspects."
@@ -121,6 +128,7 @@ if page == "🏠 Home":
 
     with col5:
         st.subheader("📊 Research Score")
+
         st.write(
             "Generate an overall research-oriented score "
             "based on multiple analysis factors."
@@ -128,6 +136,7 @@ if page == "🏠 Home":
 
     with col6:
         st.subheader("🤖 AI Research Assistant")
+
         st.write(
             "Use AI-powered retrieval and analysis to "
             "support research exploration."
@@ -145,8 +154,8 @@ elif page == "📄 Paper Analysis":
     st.write(
         """
         Upload a research paper to extract, clean,
-        split, and convert its content into numerical
-        vector representations.
+        split, embed, and index its content for
+        semantic search.
         """
     )
 
@@ -192,7 +201,7 @@ elif page == "📄 Paper Analysis":
         # --------------------------------------------------
 
         with st.spinner(
-            "Generating embeddings for the research paper..."
+            "Generating embeddings..."
         ):
 
             embedding_model = get_embedding_model()
@@ -200,6 +209,18 @@ elif page == "📄 Paper Analysis":
             embeddings = generate_embeddings(
                 chunks,
                 embedding_model
+            )
+
+        # --------------------------------------------------
+        # Step 5: Create FAISS Index
+        # --------------------------------------------------
+
+        with st.spinner(
+            "Creating FAISS vector index..."
+        ):
+
+            faiss_index = create_faiss_index(
+                embeddings
             )
 
         st.divider()
@@ -266,6 +287,29 @@ elif page == "📄 Paper Analysis":
                 "no text chunks were available."
             )
 
+        # --------------------------------------------------
+        # FAISS Status
+        # --------------------------------------------------
+
+        if faiss_index is not None:
+
+            st.success(
+                f"FAISS index created successfully with "
+                f"{faiss_index.ntotal} vectors."
+            )
+
+            st.info(
+                f"FAISS vector dimension: "
+                f"{faiss_index.d}"
+            )
+
+        else:
+
+            st.warning(
+                "FAISS index could not be created because "
+                "no embeddings were available."
+            )
+
         st.divider()
 
         # --------------------------------------------------
@@ -325,11 +369,44 @@ elif page == "📄 Paper Analysis":
             )
 
             st.write(
-                "First embedding vector (first 10 values):"
+                "First embedding vector "
+                "(first 10 values):"
             )
 
             st.code(
                 str(embeddings[0][:10])
+            )
+
+        # --------------------------------------------------
+        # FAISS Index Preview
+        # --------------------------------------------------
+
+        st.subheader("🔎 FAISS Vector Index")
+
+        if faiss_index is not None:
+
+            st.write(
+                """
+                FAISS stores the embedding vectors in a
+                searchable index. This index will be used
+                in the next stage for retrieving the most
+                relevant research-paper chunks.
+                """
+            )
+
+            st.write(
+                f"Total vectors stored: "
+                f"**{faiss_index.ntotal}**"
+            )
+
+            st.write(
+                f"Vector dimension: "
+                f"**{faiss_index.d}**"
+            )
+
+            st.success(
+                "Research paper embeddings are now "
+                "indexed and ready for semantic retrieval."
             )
 
 
