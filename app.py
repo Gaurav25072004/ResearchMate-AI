@@ -1,34 +1,23 @@
-import streamlit as st
-import tempfile
 import os
+import tempfile
+import streamlit as st
 
 from rag.pdf_loader import extract_text_from_pdf
-
-from rag.text_processor import (
-    clean_text,
-    split_text_into_chunks
-)
-
-from rag.embedding import (
-    load_embedding_model,
-    generate_embeddings
-)
-
-from rag.vector_store import (
-    create_faiss_index,
-    hybrid_search
-)
-
+from rag.text_processor import clean_text, split_text_into_chunks
+from rag.embedding import load_embedding_model, generate_embeddings
+from rag.vector_store import create_faiss_index, hybrid_search
 from rag.llm import (
     load_gemini_model,
     generate_answer,
     build_rag_prompt,
-    build_paper_analysis_prompt
+    build_paper_analysis_prompt,
 )
-
-from rag.citation_analyzer import (
-    analyze_pdf_citations
+from rag.citation_analyzer import analyze_pdf_citations
+from rag.literature_store import (
+    build_literature_corpus,
+    search_literature,
 )
+from agents.novelty_agent import build_novelty_analysis_prompt
 
 
 # ============================================================
@@ -43,14 +32,11 @@ st.set_page_config(
 
 
 # ============================================================
-# SESSION STATE
+# SESSION STATE INITIALIZATION
 # ============================================================
 
-if "paper_processed" not in st.session_state:
-    st.session_state.paper_processed = False
-
-if "paper_text" not in st.session_state:
-    st.session_state.paper_text = ""
+if "pdf_text" not in st.session_state:
+    st.session_state.pdf_text = ""
 
 if "cleaned_text" not in st.session_state:
     st.session_state.cleaned_text = ""
@@ -58,34 +44,33 @@ if "cleaned_text" not in st.session_state:
 if "chunks" not in st.session_state:
     st.session_state.chunks = []
 
+if "embedding_model" not in st.session_state:
+    st.session_state.embedding_model = None
+
 if "embeddings" not in st.session_state:
     st.session_state.embeddings = None
 
 if "faiss_index" not in st.session_state:
     st.session_state.faiss_index = None
 
+if "gemini_client" not in st.session_state:
+    st.session_state.gemini_client = None
+
+if "paper_analysis" not in st.session_state:
+    st.session_state.paper_analysis = None
+
 if "uploaded_file_name" not in st.session_state:
-    st.session_state.uploaded_file_name = ""
+    st.session_state.uploaded_file_name = None
 
 if "page_count" not in st.session_state:
     st.session_state.page_count = 0
 
-if "citation_result" not in st.session_state:
-    st.session_state.citation_result = None
+# New Day 10 literature corpus state
+if "literature_corpus" not in st.session_state:
+    st.session_state.literature_corpus = None
 
-
-# ============================================================
-# CACHED MODELS
-# ============================================================
-
-@st.cache_resource
-def get_embedding_model():
-    return load_embedding_model()
-
-
-@st.cache_resource
-def get_gemini_model():
-    return load_gemini_model()
+if "literature_corpus_path" not in st.session_state:
+    st.session_state.literature_corpus_path = None
 
 
 # ============================================================
@@ -98,15 +83,13 @@ st.sidebar.markdown(
     """
 ### AI-Powered Research Assistant
 
-Upload a research paper and explore:
-
-- 📄 Paper Analysis
-- 🔎 Citation Analysis
-- ✨ Novelty Analysis
-- 🧭 Potential Research Directions
-- 📊 Research Score
+Analyze research papers, retrieve relevant content,
+inspect citations, compare literature, and explore
+potential research directions.
 """
 )
+
+st.sidebar.markdown("---")
 
 page = st.sidebar.radio(
     "Navigate",
@@ -116,7 +99,7 @@ page = st.sidebar.radio(
         "🔎 Citation Analysis",
         "✨ Novelty Analysis",
         "🧭 Potential Research Directions",
-        "📊 Research Score"
+        "📊 Research Score",
     ]
 )
 
@@ -124,15 +107,19 @@ st.sidebar.markdown("---")
 
 st.sidebar.info(
     """
-AI-generated outputs are intended to support
-researchers and should be validated using
-domain knowledge and further literature review.
+**Important**
+
+ResearchMate AI provides AI-generated analysis
+to support researchers.
+
+Results should be validated using broader
+literature review and domain expertise.
 """
 )
 
 
 # ============================================================
-# HOME PAGE
+# HOME
 # ============================================================
 
 if page == "🏠 Home":
@@ -140,340 +127,283 @@ if page == "🏠 Home":
     st.title("📚 ResearchMate AI")
 
     st.subheader(
-        "AI-Powered Research Assistant"
+        "AI-Powered Research Paper Analysis Assistant"
     )
 
     st.markdown(
         """
-ResearchMate AI helps researchers analyze
-academic papers using Retrieval-Augmented
-Generation (RAG), semantic retrieval,
-structured paper analysis, and citation analysis.
+ResearchMate AI helps researchers and students
+understand and analyze academic literature using
+Retrieval-Augmented Generation (RAG), semantic
+retrieval, citation analysis, and cross-paper
+comparison.
 """
     )
 
     st.markdown("---")
 
-    st.header("🚀 Current Capabilities")
-
-    col1, col2 = st.columns(2)
+    col1, col2, col3 = st.columns(3)
 
     with col1:
-
         st.markdown(
             """
-### 📄 Paper Analysis
+            ### 📄 Paper Analysis
 
-Extract structured information such as:
+            Extract and analyze:
 
-- Research Problem
-- Research Objectives
-- Methodology
-- Dataset / Data
-- Results / Findings
-- Main Contributions
-- Limitations
-"""
+            - Research Problem
+            - Research Objectives
+            - Methodology
+            - Dataset / Data
+            - Results / Findings
+            - Main Contributions
+            - Limitations
+            """
         )
 
     with col2:
-
         st.markdown(
             """
-### 🔎 Citation Analysis
+            ### 🔎 Citation Analysis
 
-Analyze the reference section of
-a research paper and extract:
+            Analyze the reference section of
+            uploaded research papers.
 
-- Total references
-- Reconstructed references
-- References from two-column PDFs
-- Multi-line references
-"""
+            Identify:
+
+            - Number of references
+            - Reference entries
+            - Reference structure
+            - Citation information
+            """
+        )
+
+    with col3:
+        st.markdown(
+            """
+            ### ✨ Novelty Analysis
+
+            Compare the uploaded paper with
+            a separate literature corpus.
+
+            Analyze:
+
+            - Similarity evidence
+            - Differences
+            - Potentially distinctive aspects
+            """
         )
 
     st.markdown("---")
 
-    st.header("🧠 RAG-Based Question Answering")
-
-    st.markdown(
+    st.info(
         """
-Ask questions about the uploaded research paper.
+        🧭 **Potential Research Directions**
 
-ResearchMate AI retrieves relevant paper content
-using semantic and keyword-based retrieval and
-uses Gemini to generate a grounded answer.
-"""
-    )
+        ResearchMate AI can later provide AI-generated
+        suggestions for potentially underexplored areas
+        based on analyzed literature.
 
-    st.markdown("---")
-
-    st.header("⚠️ Important Disclaimer")
-
-    st.warning(
+        These suggestions are not definitive research gaps
+        and should be validated by the researcher.
         """
-ResearchMate AI provides AI-generated assistance.
-
-The generated analysis and suggestions should not
-be treated as definitive academic conclusions.
-
-Potential research directions should be validated
-by the researcher using domain knowledge and
-further literature review.
-"""
     )
 
 
 # ============================================================
-# PDF UPLOAD
+# UPLOAD SECTION
 # ============================================================
 
 if page in [
     "📄 Paper Analysis",
     "🔎 Citation Analysis",
-    "✨ Novelty Analysis",
-    "🧭 Potential Research Directions",
-    "📊 Research Score"
+    "✨ Novelty Analysis"
 ]:
 
-    st.title(page)
+    st.header("📤 Upload Research Paper")
 
     uploaded_file = st.file_uploader(
-        "Upload a research paper (PDF)",
+        "Upload a research paper in PDF format",
         type=["pdf"]
     )
 
     if uploaded_file is not None:
 
         # ----------------------------------------------------
-        # Detect new file
+        # Detect new uploaded paper
         # ----------------------------------------------------
 
-        if (
+        new_file = (
             st.session_state.uploaded_file_name
             != uploaded_file.name
-        ):
+        )
 
-            st.session_state.paper_processed = False
-            st.session_state.paper_text = ""
+        if new_file:
+
+            st.session_state.pdf_text = ""
             st.session_state.cleaned_text = ""
             st.session_state.chunks = []
             st.session_state.embeddings = None
             st.session_state.faiss_index = None
-            st.session_state.citation_result = None
+            st.session_state.paper_analysis = None
+            st.session_state.page_count = 0
+            st.session_state.uploaded_file_name = uploaded_file.name
 
-            st.session_state.uploaded_file_name = (
-                uploaded_file.name
-            )
+        st.success(
+            f"Uploaded: **{uploaded_file.name}**"
+        )
 
         # ----------------------------------------------------
-        # Process PDF
+        # Process uploaded paper
         # ----------------------------------------------------
 
-        if st.button(
-            "🚀 Process Research Paper",
-            type="primary"
-        ):
+        if not st.session_state.chunks:
 
-            with st.spinner(
-                "Processing research paper..."
+            if st.button(
+                "⚙️ Process Research Paper",
+                key="process_paper"
             ):
 
-                # Read PDF
-                uploaded_file.seek(0)
+                with st.spinner(
+                    "Extracting and processing research paper..."
+                ):
 
-                raw_text, page_count = (
-                    extract_text_from_pdf(
-                        uploaded_file
+                    try:
+
+                        pdf_bytes = uploaded_file.getvalue()
+
+                        class UploadedPDF:
+                            def __init__(self, data):
+                                self.data = data
+
+                            def read(self):
+                                return self.data
+
+                        pdf_object = UploadedPDF(pdf_bytes)
+
+                        # Extract PDF text
+                        text, page_count = extract_text_from_pdf(
+                            pdf_object
+                        )
+
+                        st.session_state.pdf_text = text
+                        st.session_state.page_count = page_count
+
+                        # Clean text
+                        cleaned_text = clean_text(text)
+
+                        st.session_state.cleaned_text = cleaned_text
+
+                        # Create chunks
+                        chunks = split_text_into_chunks(
+                            cleaned_text
+                        )
+
+                        st.session_state.chunks = chunks
+
+                        # Load embedding model
+                        if (
+                            st.session_state.embedding_model
+                            is None
+                        ):
+                            st.session_state.embedding_model = (
+                                load_embedding_model()
+                            )
+
+                        # Generate embeddings
+                        embeddings = generate_embeddings(
+                            chunks,
+                            st.session_state.embedding_model
+                        )
+
+                        st.session_state.embeddings = embeddings
+
+                        # Create FAISS index
+                        faiss_index = create_faiss_index(
+                            embeddings
+                        )
+
+                        st.session_state.faiss_index = faiss_index
+
+                        st.success(
+                            "Research paper processed successfully."
+                        )
+
+                        st.write(
+                            f"**Pages:** {page_count}"
+                        )
+
+                        st.write(
+                            f"**Chunks:** {len(chunks)}"
+                        )
+
+                        if faiss_index is not None:
+                            st.write(
+                                f"**FAISS vectors:** "
+                                f"{faiss_index.ntotal}"
+                            )
+
+                    except Exception as e:
+
+                        st.error(
+                            f"Error while processing paper: {e}"
+                        )
+
+        else:
+
+            st.success(
+                "Research paper is already processed."
+            )
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+                st.metric(
+                    "Pages",
+                    st.session_state.page_count
+                )
+
+            with col2:
+                st.metric(
+                    "Chunks",
+                    len(st.session_state.chunks)
+                )
+
+            with col3:
+
+                if st.session_state.faiss_index is not None:
+                    st.metric(
+                        "FAISS Vectors",
+                        st.session_state.faiss_index.ntotal
                     )
-                )
-
-                # Clean text
-                cleaned = clean_text(
-                    raw_text
-                )
-
-                # Create chunks
-                chunks = split_text_into_chunks(
-                    cleaned
-                )
-
-                # Load embedding model
-                embedding_model = (
-                    get_embedding_model()
-                )
-
-                # Generate embeddings
-                embeddings = generate_embeddings(
-                    chunks,
-                    embedding_model
-                )
-
-                # Create FAISS index
-                faiss_index = create_faiss_index(
-                    embeddings
-                )
-
-                # Save to session
-                st.session_state.paper_text = (
-                    raw_text
-                )
-
-                st.session_state.cleaned_text = (
-                    cleaned
-                )
-
-                st.session_state.chunks = (
-                    chunks
-                )
-
-                st.session_state.embeddings = (
-                    embeddings
-                )
-
-                st.session_state.faiss_index = (
-                    faiss_index
-                )
-
-                st.session_state.page_count = (
-                    page_count
-                )
-
-                st.session_state.paper_processed = (
-                    True
-                )
-
-                st.success(
-                    "Research paper processed successfully!"
-                )
 
 
 # ============================================================
-# PAPER ANALYSIS PAGE
+# PAPER ANALYSIS
 # ============================================================
 
 if page == "📄 Paper Analysis":
 
-    if not st.session_state.paper_processed:
+    st.title("📄 Research Paper Analysis")
 
-        st.info(
-            "Upload a PDF and click "
-            "'Process Research Paper' to begin."
+    if not st.session_state.chunks:
+
+        st.warning(
+            "Please upload and process a research paper first."
         )
 
     else:
 
-        st.success(
-            f"Paper ready: "
-            f"{st.session_state.uploaded_file_name}"
-        )
-
-        # ----------------------------------------------------
-        # PAPER METRICS
-        # ----------------------------------------------------
-
-        col1, col2, col3 = st.columns(3)
-
-        with col1:
-            st.metric(
-                "Pages",
-                st.session_state.page_count
-            )
-
-        with col2:
-            st.metric(
-                "Characters",
-                len(
-                    st.session_state.paper_text
-                )
-            )
-
-        with col3:
-            st.metric(
-                "Chunks",
-                len(
-                    st.session_state.chunks
-                )
-            )
-
-        st.markdown("---")
-
-        # ----------------------------------------------------
-        # RAW TEXT
-        # ----------------------------------------------------
-
-        with st.expander(
-            "📜 View Extracted Text"
-        ):
-
-            st.text_area(
-                "Extracted Text",
-                st.session_state.paper_text,
-                height=300
-            )
-
-        # ----------------------------------------------------
-        # CLEANED TEXT
-        # ----------------------------------------------------
-
-        with st.expander(
-            "🧹 View Cleaned Text"
-        ):
-
-            st.text_area(
-                "Cleaned Text",
-                st.session_state.cleaned_text,
-                height=300
-            )
-
-        # ----------------------------------------------------
-        # CHUNKS
-        # ----------------------------------------------------
-
-        with st.expander(
-            "🧩 View Text Chunks"
-        ):
-
-            st.write(
-                f"Total chunks: "
-                f"{len(st.session_state.chunks)}"
-            )
-
-            for i, chunk in enumerate(
-                st.session_state.chunks
-            ):
-
-                st.markdown(
-                    f"**Chunk {i + 1}**"
-                )
-
-                st.write(chunk)
-
-                st.markdown("---")
-
-        st.markdown("---")
-
-        # ====================================================
-        # RAG QUESTION ANSWERING
-        # ====================================================
-
-        st.header(
-            "💬 Ask Questions About the Paper"
-        )
+        st.subheader("💬 Ask Questions About the Paper")
 
         question = st.text_input(
-            "Enter your research question:"
-        )
-
-        top_k = st.slider(
-            "Number of retrieved chunks",
-            min_value=3,
-            max_value=10,
-            value=5
+            "Enter your research question",
+            placeholder="Example: What methodology was used in the study?"
         )
 
         if st.button(
-            "🔎 Ask ResearchMate AI"
+            "🔍 Ask Question",
+            key="ask_question"
         ):
 
             if not question.strip():
@@ -488,332 +418,297 @@ if page == "📄 Paper Analysis":
                     "Searching the research paper..."
                 ):
 
-                    embedding_model = (
-                        get_embedding_model()
-                    )
+                    try:
 
-                    query_embedding = (
-                        embedding_model.encode(
-                            [question]
+                        # Load Gemini
+                        if (
+                            st.session_state.gemini_client
+                            is None
+                        ):
+                            st.session_state.gemini_client = (
+                                load_gemini_model()
+                            )
+
+                        # Query embedding
+                        query_embedding = (
+                            st.session_state.embedding_model
+                            .encode([question])[0]
                         )
-                    )
 
-                    retrieved_chunks = hybrid_search(
-                        question,
-                        query_embedding,
-                        st.session_state.chunks,
-                        st.session_state.faiss_index,
-                        top_k=top_k
-                    )
+                        # Hybrid retrieval
+                        retrieved_results = hybrid_search(
+                            st.session_state.faiss_index,
+                            query_embedding,
+                            question,
+                            st.session_state.chunks,
+                            top_k=5
+                        )
 
-                with st.spinner(
-                    "Generating grounded answer..."
-                ):
+                        retrieved_chunks = [
+                            result["chunk"]
+                            for result in retrieved_results
+                        ]
 
-                    gemini_client = (
-                        get_gemini_model()
-                    )
+                        # Build prompt
+                        prompt = build_rag_prompt(
+                            question,
+                            retrieved_chunks
+                        )
 
-                    prompt = build_rag_prompt(
-                        question,
-                        retrieved_chunks
-                    )
+                        # Gemini answer
+                        answer = generate_answer(
+                            st.session_state.gemini_client,
+                            prompt
+                        )
 
-                    answer = generate_answer(
-                        gemini_client,
-                        prompt
-                    )
+                        st.markdown("### 🤖 Answer")
 
-                st.markdown(
-                    "### 🤖 Answer"
-                )
+                        st.write(answer)
 
-                st.write(answer)
+                        # ------------------------------------------------
+                        # Retrieval evidence
+                        # ------------------------------------------------
 
-                st.caption(
-                    "Answer generated using retrieved "
-                    "content from the uploaded research paper."
-                )
+                        with st.expander(
+                            "🔎 View Retrieved Evidence"
+                        ):
+
+                            for i, result in enumerate(
+                                retrieved_results,
+                                start=1
+                            ):
+
+                                st.markdown(
+                                    f"### Result {i}"
+                                )
+
+                                st.write(
+                                    f"Semantic Score: "
+                                    f"{result['semantic_score']:.4f}"
+                                )
+
+                                st.write(
+                                    f"Keyword Score: "
+                                    f"{result['keyword_score']:.4f}"
+                                )
+
+                                st.write(
+                                    f"Section Score: "
+                                    f"{result['section_score']:.4f}"
+                                )
+
+                                st.write(
+                                    f"Final Score: "
+                                    f"{result['final_score']:.4f}"
+                                )
+
+                                st.text(
+                                    result["chunk"]
+                                )
+
+                                st.markdown("---")
+
+                    except Exception as e:
+
+                        st.error(
+                            f"Error while answering question: {e}"
+                        )
 
         st.markdown("---")
 
-        # ====================================================
-        # STRUCTURED PAPER ANALYSIS
-        # ====================================================
-
-        st.header(
+        st.subheader(
             "📊 Structured Research Paper Analysis"
         )
 
-        st.markdown(
-            """
-ResearchMate AI analyzes the retrieved paper
-content and organizes the findings into
-standard research categories.
-"""
-        )
-
         if st.button(
-            "🧠 Analyze Research Paper"
+            "🧠 Analyze Entire Paper",
+            key="analyze_paper"
         ):
 
             with st.spinner(
-                "Retrieving relevant paper sections..."
+                "Analyzing research paper..."
             ):
 
-                embedding_model = (
-                    get_embedding_model()
-                )
+                try:
 
-                analysis_query = """
-                research problem objectives methodology
-                dataset results findings contributions
-                limitations
-                """
+                    if (
+                        st.session_state.gemini_client
+                        is None
+                    ):
+                        st.session_state.gemini_client = (
+                            load_gemini_model()
+                        )
 
-                query_embedding = (
-                    embedding_model.encode(
-                        [analysis_query]
+                    # Retrieve broad paper context
+                    analysis_query = (
+                        "research problem objectives methodology "
+                        "dataset results findings contributions limitations"
                     )
-                )
 
-                retrieved_chunks = hybrid_search(
-                    analysis_query,
-                    query_embedding,
-                    st.session_state.chunks,
-                    st.session_state.faiss_index,
-                    top_k=7
-                )
+                    query_embedding = (
+                        st.session_state.embedding_model
+                        .encode([analysis_query])[0]
+                    )
 
-            with st.spinner(
-                "Generating structured analysis..."
-            ):
+                    retrieved_results = hybrid_search(
+                        st.session_state.faiss_index,
+                        query_embedding,
+                        analysis_query,
+                        st.session_state.chunks,
+                        top_k=10
+                    )
 
-                gemini_client = (
-                    get_gemini_model()
-                )
+                    retrieved_chunks = [
+                        result["chunk"]
+                        for result in retrieved_results
+                    ]
 
-                prompt = (
-                    build_paper_analysis_prompt(
+                    prompt = build_paper_analysis_prompt(
                         retrieved_chunks
                     )
-                )
 
-                analysis = generate_answer(
-                    gemini_client,
-                    prompt
-                )
+                    analysis = generate_answer(
+                        st.session_state.gemini_client,
+                        prompt
+                    )
 
-            st.markdown(analysis)
+                    st.session_state.paper_analysis = analysis
 
-            st.info(
-                """
-The structured analysis is generated only
-from retrieved content from the uploaded paper.
-"""
+                except Exception as e:
+
+                    st.error(
+                        f"Error during paper analysis: {e}"
+                    )
+
+        if st.session_state.paper_analysis:
+
+            st.markdown(
+                st.session_state.paper_analysis
             )
 
 
 # ============================================================
-# CITATION ANALYSIS - DAY 9
+# CITATION ANALYSIS
 # ============================================================
 
 if page == "🔎 Citation Analysis":
 
-    if not st.session_state.paper_processed:
+    st.title("🔎 Citation Analysis")
 
-        st.info(
-            "Upload a PDF and click "
-            "'Process Research Paper' to begin."
+    if uploaded_file is None:
+
+        st.warning(
+            "Please upload a research paper first."
         )
 
     else:
 
-        st.success(
-            f"Paper ready: "
-            f"{st.session_state.uploaded_file_name}"
-        )
-
-        st.header(
-            "🔎 Citation Analysis"
-        )
-
-        st.markdown(
-            """
-ResearchMate AI extracts and reconstructs the
-reference section of the uploaded research paper.
-
-The citation analyzer handles:
-
-- Two-column academic PDFs
-- Multi-line references
-- Author-year references
-- PDF line-break artifacts
-"""
-        )
-
-        st.markdown("---")
-
-        # ----------------------------------------------------
-        # ANALYZE CITATIONS
-        # ----------------------------------------------------
-
         if st.button(
             "🔎 Analyze Citations",
-            type="primary"
+            key="analyze_citations"
         ):
 
             with st.spinner(
-                "Analyzing references..."
+                "Analyzing citations and references..."
             ):
 
-                uploaded_file.seek(0)
-
-                pdf_bytes = uploaded_file.read()
-
-                temp_pdf_path = None
-
                 try:
+
+                    pdf_bytes = uploaded_file.getvalue()
 
                     with tempfile.NamedTemporaryFile(
                         delete=False,
                         suffix=".pdf"
-                    ) as temp_file:
+                    ) as temp_pdf:
 
-                        temp_file.write(
-                            pdf_bytes
+                        temp_pdf.write(pdf_bytes)
+
+                        temp_pdf_path = temp_pdf.name
+
+                    try:
+
+                        citation_result = (
+                            analyze_pdf_citations(
+                                temp_pdf_path
+                            )
                         )
 
-                        temp_pdf_path = (
-                            temp_file.name
-                        )
+                    finally:
 
-                    citation_result = (
-                        analyze_pdf_citations(
+                        if os.path.exists(
                             temp_pdf_path
-                        )
+                        ):
+                            os.remove(
+                                temp_pdf_path
+                            )
+
+                    st.success(
+                        "Citation analysis completed."
                     )
 
-                    st.session_state.citation_result = (
-                        citation_result
-                    )
+                    # ------------------------------------------------
+                    # Summary
+                    # ------------------------------------------------
 
-                finally:
+                    col1, col2, col3 = st.columns(3)
 
-                    if (
-                        temp_pdf_path
-                        and os.path.exists(
-                            temp_pdf_path
-                        )
-                    ):
-
-                        os.remove(
-                            temp_pdf_path
+                    with col1:
+                        st.metric(
+                            "Pages",
+                            citation_result[
+                                "page_count"
+                            ]
                         )
 
-            st.success(
-                "Citation analysis completed!"
-            )
+                    with col2:
+                        st.metric(
+                            "Reference Blocks",
+                            citation_result[
+                                "reference_blocks"
+                            ]
+                        )
 
-        # ----------------------------------------------------
-        # DISPLAY CITATION RESULTS
-        # ----------------------------------------------------
+                    with col3:
+                        st.metric(
+                            "Parsed References",
+                            citation_result[
+                                "total_references"
+                            ]
+                        )
 
-        if st.session_state.citation_result:
+                    st.markdown("---")
 
-            result = (
-                st.session_state.citation_result
-            )
-
-            total_references = result.get(
-                "total_references",
-                0
-            )
-
-            reference_blocks = result.get(
-                "reference_blocks",
-                0
-            )
-
-            page_count = result.get(
-                "page_count",
-                st.session_state.page_count
-            )
-
-            references = result.get(
-                "references",
-                result.get(
-                    "parsed_references",
-                    []
-                )
-            )
-
-            st.markdown("---")
-
-            st.subheader(
-                "📊 Citation Statistics"
-            )
-
-            col1, col2, col3 = st.columns(3)
-
-            with col1:
-
-                st.metric(
-                    "PDF Pages",
-                    page_count
-                )
-
-            with col2:
-
-                st.metric(
-                    "Reference Blocks",
-                    reference_blocks
-                )
-
-            with col3:
-
-                st.metric(
-                    "Total References",
-                    total_references
-                )
-
-            st.markdown("---")
-
-            st.subheader(
-                "📚 Extracted References"
-            )
-
-            if references:
-
-                for i, reference in enumerate(
-                    references,
-                    start=1
-                ):
-
-                    st.markdown(
-                        f"**{i}.** {reference}"
+                    st.subheader(
+                        "📚 Extracted References"
                     )
 
-            else:
+                    references = citation_result.get(
+                        "references",
+                        []
+                    )
 
-                st.warning(
-                    "No references were detected "
-                    "in the uploaded paper."
-                )
+                    if references:
 
-            st.markdown("---")
+                        for i, reference in enumerate(
+                            references,
+                            start=1
+                        ):
 
-            st.info(
-                """
-Citation analysis currently focuses on
-extracting and reconstructing the reference
-section.
+                            st.markdown(
+                                f"**{i}.** {reference}"
+                            )
 
-Future versions can extend this module with
-citation-year analysis, citation frequency,
-and additional bibliographic insights.
-"""
-            )
+                    else:
+
+                        st.info(
+                            "No references were successfully parsed."
+                        )
+
+                except Exception as e:
+
+                    st.error(
+                        f"Error during citation analysis: {e}"
+                    )
 
 
 # ============================================================
@@ -822,42 +717,478 @@ and additional bibliographic insights.
 
 if page == "✨ Novelty Analysis":
 
-    st.header(
-        "✨ Novelty Analysis"
+    st.title("✨ Cross-Paper Novelty Analysis")
+
+    st.markdown(
+        """
+This module compares the uploaded research paper
+with **separate research papers stored in the
+literature corpus**.
+
+The analysis focuses on:
+
+- Similarity Evidence
+- Differences
+- Potentially Distinctive Aspects
+
+It does **not** claim to definitively prove novelty
+or identify a research gap.
+"""
     )
 
     st.info(
         """
-Novelty Analysis will evaluate potentially
-novel aspects of the research paper using
-retrieved literature context.
-"""
-    )
+        🧭 **Important**
 
-    st.markdown(
+        The generated observations are based only on
+        the uploaded paper and the retrieved literature.
+
+        They should be validated through broader
+        literature review and domain expertise.
         """
-### Planned Workflow
-
-Research Paper
-↓
-Relevant Literature Retrieval
-↓
-Similarity Comparison
-↓
-Novelty Indicators
-↓
-AI-Assisted Novelty Analysis
-
-This module will be developed in a later stage.
-"""
     )
 
-    st.warning(
-        """
-AI-generated novelty assessment should not be
-treated as definitive evidence of originality.
-"""
-    )
+    # --------------------------------------------------------
+    # Check uploaded paper
+    # --------------------------------------------------------
+
+    if not st.session_state.chunks:
+
+        st.warning(
+            "Please upload and process a research paper first."
+        )
+
+    else:
+
+        # ----------------------------------------------------
+        # Literature corpus path
+        # ----------------------------------------------------
+
+        literature_directory = os.path.join(
+            "documents",
+            "literature"
+        )
+
+        st.markdown("---")
+
+        st.subheader(
+            "📚 Separate Literature Corpus"
+        )
+
+        st.write(
+            f"Literature directory: "
+            f"`{literature_directory}`"
+        )
+
+        # ----------------------------------------------------
+        # Build / load literature corpus
+        # ----------------------------------------------------
+
+        if st.button(
+            "🔄 Build Literature Corpus",
+            key="build_literature_corpus"
+        ):
+
+            with st.spinner(
+                "Loading literature papers and building literature index..."
+            ):
+
+                try:
+
+                    if (
+                        st.session_state.embedding_model
+                        is None
+                    ):
+                        st.session_state.embedding_model = (
+                            load_embedding_model()
+                        )
+
+                    literature_corpus = (
+                        build_literature_corpus(
+                            literature_directory,
+                            st.session_state.embedding_model
+                        )
+                    )
+
+                    st.session_state.literature_corpus = (
+                        literature_corpus
+                    )
+
+                    st.session_state.literature_corpus_path = (
+                        literature_directory
+                    )
+
+                    literature_papers = (
+                        literature_corpus.get(
+                            "papers",
+                            []
+                        )
+                    )
+
+                    literature_chunks = (
+                        literature_corpus.get(
+                            "chunks",
+                            []
+                        )
+                    )
+
+                    st.success(
+                        "Literature corpus built successfully."
+                    )
+
+                    col1, col2, col3 = st.columns(3)
+
+                    with col1:
+                        st.metric(
+                            "Literature Papers",
+                            len(literature_papers)
+                        )
+
+                    with col2:
+                        st.metric(
+                            "Literature Chunks",
+                            len(literature_chunks)
+                        )
+
+                    with col3:
+
+                        literature_index = (
+                            literature_corpus.get(
+                                "index"
+                            )
+                        )
+
+                        if literature_index is not None:
+
+                            st.metric(
+                                "FAISS Vectors",
+                                literature_index.ntotal
+                            )
+
+                except Exception as e:
+
+                    st.error(
+                        f"Error building literature corpus: {e}"
+                    )
+
+        # ----------------------------------------------------
+        # Display current corpus status
+        # ----------------------------------------------------
+
+        if st.session_state.literature_corpus:
+
+            literature_corpus = (
+                st.session_state.literature_corpus
+            )
+
+            literature_papers = (
+                literature_corpus.get(
+                    "papers",
+                    []
+                )
+            )
+
+            literature_chunks = (
+                literature_corpus.get(
+                    "chunks",
+                    []
+                )
+            )
+
+            literature_index = (
+                literature_corpus.get(
+                    "index"
+                )
+            )
+
+            st.success(
+                "Separate literature corpus is ready."
+            )
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+
+                st.metric(
+                    "Literature Papers",
+                    len(literature_papers)
+                )
+
+            with col2:
+
+                st.metric(
+                    "Literature Chunks",
+                    len(literature_chunks)
+                )
+
+            with col3:
+
+                if literature_index is not None:
+
+                    st.metric(
+                        "FAISS Vectors",
+                        literature_index.ntotal
+                    )
+
+            # ------------------------------------------------
+            # Literature papers list
+            # ------------------------------------------------
+
+            with st.expander(
+                "📚 View Literature Corpus"
+            ):
+
+                for paper in literature_papers:
+
+                    st.markdown(
+                        f"**{paper['source']}**"
+                    )
+
+                    st.write(
+                        f"Pages: {paper['page_count']}"
+                    )
+
+                    st.markdown("---")
+
+            st.markdown("---")
+
+            # ------------------------------------------------
+            # Generate novelty analysis
+            # ------------------------------------------------
+
+            st.subheader(
+                "✨ Generate Cross-Paper Analysis"
+            )
+
+            if st.button(
+                "✨ Analyze Potential Novelty",
+                key="analyze_novelty"
+            ):
+
+                with st.spinner(
+                    "Comparing uploaded paper with separate literature..."
+                ):
+
+                    try:
+
+                        # --------------------------------------------
+                        # Load Gemini
+                        # --------------------------------------------
+
+                        if (
+                            st.session_state.gemini_client
+                            is None
+                        ):
+                            st.session_state.gemini_client = (
+                                load_gemini_model()
+                            )
+
+                        # --------------------------------------------
+                        # Generate paper analysis if missing
+                        # --------------------------------------------
+
+                        if (
+                            not st.session_state.paper_analysis
+                        ):
+
+                            analysis_query = (
+                                "research problem objectives methodology "
+                                "dataset results findings contributions limitations"
+                            )
+
+                            query_embedding = (
+                                st.session_state.embedding_model
+                                .encode(
+                                    [analysis_query]
+                                )[0]
+                            )
+
+                            paper_results = hybrid_search(
+                                st.session_state.faiss_index,
+                                query_embedding,
+                                analysis_query,
+                                st.session_state.chunks,
+                                top_k=10
+                            )
+
+                            paper_chunks = [
+                                result["chunk"]
+                                for result in paper_results
+                            ]
+
+                            paper_prompt = (
+                                build_paper_analysis_prompt(
+                                    paper_chunks
+                                )
+                            )
+
+                            paper_analysis = (
+                                generate_answer(
+                                    st.session_state.gemini_client,
+                                    paper_prompt
+                                )
+                            )
+
+                            st.session_state.paper_analysis = (
+                                paper_analysis
+                            )
+
+                        else:
+
+                            paper_analysis = (
+                                st.session_state.paper_analysis
+                            )
+
+                        # --------------------------------------------
+                        # Create literature retrieval query
+                        # --------------------------------------------
+
+                        literature_query = (
+                            """
+                            research problem methodology
+                            approach dataset results contribution
+                            research focus
+                            """
+                        )
+
+                        # --------------------------------------------
+                        # Search separate literature corpus
+                        # --------------------------------------------
+
+                        literature_results = search_literature(
+                            literature_corpus,
+                            literature_query,
+                            st.session_state.embedding_model,
+                            top_k=7
+                        )
+
+                        if not literature_results:
+
+                            st.warning(
+                                """
+                                No relevant literature was retrieved
+                                from the separate literature corpus.
+                                """
+                            )
+
+                        else:
+
+                            # ----------------------------------------
+                            # Build novelty prompt
+                            # ----------------------------------------
+
+                            novelty_prompt = (
+                                build_novelty_analysis_prompt(
+                                    paper_analysis,
+                                    literature_results
+                                )
+                            )
+
+                            # ----------------------------------------
+                            # Generate novelty analysis
+                            # ----------------------------------------
+
+                            novelty_analysis = (
+                                generate_answer(
+                                    st.session_state.gemini_client,
+                                    novelty_prompt
+                                )
+                            )
+
+                            st.success(
+                                "Cross-paper novelty analysis completed."
+                            )
+
+                            st.markdown("---")
+
+                            st.subheader(
+                                "🧠 Analysis"
+                            )
+
+                            st.markdown(
+                                novelty_analysis
+                            )
+
+                            st.markdown("---")
+
+                            # ----------------------------------------
+                            # Retrieved literature evidence
+                            # ----------------------------------------
+
+                            st.subheader(
+                                "📚 Retrieved Literature Evidence"
+                            )
+
+                            st.caption(
+                                """
+                                These are the literature chunks used
+                                to generate the comparison.
+                                """
+                            )
+
+                            for i, result in enumerate(
+                                literature_results,
+                                start=1
+                            ):
+
+                                with st.expander(
+                                    f"{i}. {result['source']}"
+                                ):
+
+                                    st.write(
+                                        f"**Source:** "
+                                        f"{result['source']}"
+                                    )
+
+                                    st.write(
+                                        f"**Pages:** "
+                                        f"{result['page_count']}"
+                                    )
+
+                                    st.write(
+                                        f"**Semantic Score:** "
+                                        f"{result['semantic_score']:.4f}"
+                                    )
+
+                                    st.write(
+                                        f"**Keyword Score:** "
+                                        f"{result['keyword_score']:.4f}"
+                                    )
+
+                                    st.write(
+                                        f"**Section Score:** "
+                                        f"{result['section_score']:.4f}"
+                                    )
+
+                                    st.write(
+                                        f"**Final Score:** "
+                                        f"{result['final_score']:.4f}"
+                                    )
+
+                                    st.markdown(
+                                        "**Retrieved Content:**"
+                                    )
+
+                                    st.text(
+                                        result["chunk"]
+                                    )
+
+                    except Exception as e:
+
+                        st.error(
+                            f"Error during novelty analysis: {e}"
+                        )
+
+        else:
+
+            st.warning(
+                """
+                Literature corpus is not loaded yet.
+
+                Click **Build Literature Corpus** above
+                before running cross-paper novelty analysis.
+                """
+            )
 
 
 # ============================================================
@@ -866,41 +1197,31 @@ treated as definitive evidence of originality.
 
 if page == "🧭 Potential Research Directions":
 
-    st.header(
+    st.title(
         "🧭 Potential Research Directions"
-    )
-
-    st.info(
-        """
-This module will suggest potentially
-underexplored research areas based on the
-uploaded paper and retrieved literature.
-"""
     )
 
     st.markdown(
         """
-### Planned Workflow
+This module is intended to suggest **potential research
+directions** based on analyzed literature.
 
-Research Paper
-↓
-Literature Retrieval
-↓
-Comparison of Existing Approaches
-↓
-Identify Potentially Underexplored Areas
-↓
-Potential Research Direction Suggestions
+ResearchMate AI does not claim to definitively identify
+or prove a research gap.
 """
     )
 
-    st.warning(
+    st.info(
         """
-AI-generated suggestions are not definitive
-research gaps. Researchers should validate
-these potential research directions using
-domain knowledge and further literature review.
-"""
+        🚧 This module is currently under development.
+
+        Future versions will analyze the uploaded paper
+        together with retrieved literature and generate
+        AI-assisted research opportunity suggestions.
+
+        All suggestions will require validation through
+        broader literature review and domain expertise.
+        """
     )
 
 
@@ -910,38 +1231,30 @@ domain knowledge and further literature review.
 
 if page == "📊 Research Score":
 
-    st.header(
+    st.title(
         "📊 Research Score"
     )
 
     st.info(
         """
-The Research Score module will provide
-structured indicators for evaluating different
-dimensions of a research paper.
-"""
-    )
+        🚧 Research Score is currently under development.
 
-    st.markdown(
+        Future versions may provide structured indicators
+        related to research-paper characteristics.
+
+        Any such score should be treated as an AI-assisted
+        indicator rather than an objective measurement of
+        research quality or originality.
         """
-### Planned Evaluation Dimensions
-
-- Methodology
-- Dataset / Data
-- Results
-- Contributions
-- Limitations
-- Literature Context
-- Potential Research Directions
-
-This module will be implemented in a later stage.
-"""
     )
 
-    st.warning(
-        """
-AI-generated scores should be treated as
-supporting indicators rather than definitive
-academic evaluations.
-"""
-    )
+
+# ============================================================
+# FOOTER
+# ============================================================
+
+st.markdown("---")
+
+st.caption(
+    "ResearchMate AI • AI-assisted academic research analysis"
+)

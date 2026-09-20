@@ -37,6 +37,8 @@ def generate_answer(client, prompt):
     )
 
     return response.text
+
+
 def build_rag_prompt(question, retrieved_chunks):
     """
     Build a prompt using the user's question
@@ -71,6 +73,9 @@ User Question:
 
 Answer:
 """
+
+    return prompt
+
 
 def build_paper_analysis_prompt(
     retrieved_chunks

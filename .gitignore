@@ -6,3 +6,4 @@ __pycache__/
 *.faiss
 *.index
 .DS_Store
+documents/literature/*.pdf
