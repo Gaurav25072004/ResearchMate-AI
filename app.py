@@ -21,6 +21,9 @@ from agents.novelty_agent import build_novelty_analysis_prompt
 from agents.research_direction_agent import (
     build_research_direction_prompt
 )
+from agents.research_assessment_agent import (
+    build_research_assessment_prompt
+)
 
 
 # ============================================================
@@ -85,6 +88,13 @@ if "novelty_analysis" not in st.session_state:
 if "research_directions" not in st.session_state:
     st.session_state.research_directions = None
 
+# Day 12 research assessment state
+if "citation_analysis" not in st.session_state:
+    st.session_state.citation_analysis = None
+
+if "research_assessment" not in st.session_state:
+    st.session_state.research_assessment = None
+
 
 # ============================================================
 # SIDEBAR
@@ -112,7 +122,7 @@ page = st.sidebar.radio(
         "🔎 Citation Analysis",
         "✨ Novelty Analysis",
         "🧭 Potential Research Directions",
-        "📊 Research Score",
+        "📊 Research Assessment",
     ]
 )
 
@@ -233,7 +243,8 @@ if page in [
     "📄 Paper Analysis",
     "🔎 Citation Analysis",
     "✨ Novelty Analysis",
-    "🧭 Potential Research Directions"
+    "🧭 Potential Research Directions",
+    "📊 Research Assessment"
 ]:
 
     st.header("📤 Upload Research Paper")
@@ -268,6 +279,10 @@ if page in [
             st.session_state.literature_results = []
             st.session_state.novelty_analysis = None
             st.session_state.research_directions = None
+
+            # Reset Day 12 analysis state
+            st.session_state.citation_analysis = None
+            st.session_state.research_assessment = None
 
             st.session_state.uploaded_file_name = (
                 uploaded_file.name
@@ -705,6 +720,19 @@ if page == "🔎 Citation Analysis":
                                 temp_pdf_path
                             )
 
+                    # Save citation analysis for
+                    # Research Assessment
+                    st.session_state.citation_analysis = (
+                        citation_result
+                    )
+
+                    # A new citation analysis means
+                    # previous research assessment should
+                    # be regenerated.
+                    st.session_state.research_assessment = (
+                        None
+                    )
+
                     st.success(
                         "Citation analysis completed."
                     )
@@ -771,6 +799,51 @@ if page == "🔎 Citation Analysis":
                     st.error(
                         f"Error during citation analysis: {e}"
                     )
+
+    # Display previously generated citation analysis
+    # after navigating back to this page.
+    if st.session_state.citation_analysis:
+
+        citation_result = (
+            st.session_state.citation_analysis
+        )
+
+        if uploaded_file is not None:
+
+            st.markdown("---")
+
+            st.subheader(
+                "📚 Current Citation Analysis"
+            )
+
+            col1, col2, col3 = st.columns(3)
+
+            with col1:
+
+                st.metric(
+                    "Pages",
+                    citation_result[
+                        "page_count"
+                    ]
+                )
+
+            with col2:
+
+                st.metric(
+                    "Reference Blocks",
+                    citation_result[
+                        "reference_blocks"
+                    ]
+                )
+
+            with col3:
+
+                st.metric(
+                    "Parsed References",
+                    citation_result[
+                        "total_references"
+                    ]
+                )
 
 
 # ============================================================
@@ -1012,8 +1085,7 @@ or identify a research gap.
                         f"Pages: {paper['page_count']}"
                     )
 
-                    st.markdown("---"
-                    )
+                    st.markdown("---")
 
             st.markdown("---")
 
@@ -1512,27 +1584,193 @@ and domain expertise.
 
 
 # ============================================================
-# RESEARCH SCORE
+# RESEARCH ASSESSMENT — DAY 12
 # ============================================================
 
-if page == "📊 Research Score":
+if page == "📊 Research Assessment":
 
     st.title(
-        "📊 Research Score"
+        "📊 Research Assessment"
+    )
+
+    st.markdown(
+        """
+This module provides a structured assessment of
+how clearly and completely different aspects of
+the research paper are reported.
+
+The assessment does **not** measure research quality,
+scientific validity, originality, or publication
+potential.
+"""
     )
 
     st.info(
         """
-        🚧 Research Score is currently under development.
+        **Researcher Validation**
 
-        Future versions may provide structured indicators
-        related to research-paper characteristics.
+        This assessment is an AI-generated analysis of
+        information reported in the supplied paper analysis
+        and citation analysis.
 
-        Any such score should be treated as an AI-assisted
-        indicator rather than an objective measurement of
-        research quality or originality.
+        It should be interpreted as a structured aid for
+        reviewing the paper rather than an objective measure
+        of research quality, scientific validity, or originality.
         """
     )
+
+    # --------------------------------------------------------
+    # Check paper processing
+    # --------------------------------------------------------
+
+    if not st.session_state.chunks:
+
+        st.warning(
+            "Please upload and process a research paper first."
+        )
+
+    # --------------------------------------------------------
+    # Check paper analysis
+    # --------------------------------------------------------
+
+    elif not st.session_state.paper_analysis:
+
+        st.warning(
+            """
+            Paper analysis has not been generated yet.
+
+            Go to **📄 Paper Analysis** and click
+            **🧠 Analyze Entire Paper** first.
+            """
+        )
+
+    # --------------------------------------------------------
+    # Check citation analysis
+    # --------------------------------------------------------
+
+    elif not st.session_state.citation_analysis:
+
+        st.warning(
+            """
+            Citation analysis has not been generated yet.
+
+            Go to **🔎 Citation Analysis** and click
+            **🔎 Analyze Citations** first.
+            """
+        )
+
+    else:
+
+        st.success(
+            "Paper analysis and citation analysis are ready."
+        )
+
+        st.markdown("---")
+
+        st.subheader(
+            "📊 Generate Research Assessment"
+        )
+
+        st.write(
+            """
+            ResearchMate AI will assess the clarity and
+            completeness of the information reported in
+            the research paper.
+            """
+        )
+
+        if st.button(
+            "📊 Generate Research Assessment",
+            key="generate_research_assessment"
+        ):
+
+            with st.spinner(
+                "Generating structured research assessment..."
+            ):
+
+                try:
+
+                    # --------------------------------------------
+                    # Load Gemini
+                    # --------------------------------------------
+
+                    if (
+                        st.session_state.gemini_client
+                        is None
+                    ):
+
+                        st.session_state.gemini_client = (
+                            load_gemini_model()
+                        )
+
+                    # --------------------------------------------
+                    # Build assessment prompt
+                    # --------------------------------------------
+
+                    assessment_prompt = (
+                        build_research_assessment_prompt(
+                            st.session_state.paper_analysis,
+                            st.session_state.citation_analysis
+                        )
+                    )
+
+                    # --------------------------------------------
+                    # Generate assessment
+                    # --------------------------------------------
+
+                    research_assessment = (
+                        generate_answer(
+                            st.session_state.gemini_client,
+                            assessment_prompt
+                        )
+                    )
+
+                    st.session_state.research_assessment = (
+                        research_assessment
+                    )
+
+                    st.success(
+                        "Research assessment generated successfully."
+                    )
+
+                except Exception as e:
+
+                    st.error(
+                        f"Error generating research assessment: {e}"
+                    )
+
+        # --------------------------------------------------------
+        # Display assessment
+        # --------------------------------------------------------
+
+        if st.session_state.research_assessment:
+
+            st.markdown("---")
+
+            st.subheader(
+                "📊 Research Assessment"
+            )
+
+            st.markdown(
+                st.session_state.research_assessment
+            )
+
+            st.markdown("---")
+
+            st.warning(
+                """
+                **Researcher Validation Required**
+
+                This assessment is an AI-generated analysis
+                of the information reported in the supplied
+                paper analysis and citation analysis.
+
+                It should be interpreted as a structured aid
+                for reviewing the paper rather than an objective
+                measure of research quality, scientific validity,
+                or originality.
+                """
+            )
 
 
 # ============================================================
