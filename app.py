@@ -18,6 +18,9 @@ from rag.literature_store import (
     search_literature,
 )
 from agents.novelty_agent import build_novelty_analysis_prompt
+from agents.research_direction_agent import (
+    build_research_direction_prompt
+)
 
 
 # ============================================================
@@ -65,12 +68,22 @@ if "uploaded_file_name" not in st.session_state:
 if "page_count" not in st.session_state:
     st.session_state.page_count = 0
 
-# New Day 10 literature corpus state
+# Day 10 literature corpus state
 if "literature_corpus" not in st.session_state:
     st.session_state.literature_corpus = None
 
 if "literature_corpus_path" not in st.session_state:
     st.session_state.literature_corpus_path = None
+
+# Day 11 research comparison state
+if "literature_results" not in st.session_state:
+    st.session_state.literature_results = []
+
+if "novelty_analysis" not in st.session_state:
+    st.session_state.novelty_analysis = None
+
+if "research_directions" not in st.session_state:
+    st.session_state.research_directions = None
 
 
 # ============================================================
@@ -135,8 +148,9 @@ if page == "🏠 Home":
 ResearchMate AI helps researchers and students
 understand and analyze academic literature using
 Retrieval-Augmented Generation (RAG), semantic
-retrieval, citation analysis, and cross-paper
-comparison.
+retrieval, citation analysis, cross-paper
+comparison, and potential research direction
+suggestions.
 """
     )
 
@@ -200,12 +214,13 @@ comparison.
         """
         🧭 **Potential Research Directions**
 
-        ResearchMate AI can later provide AI-generated
-        suggestions for potentially underexplored areas
-        based on analyzed literature.
+        ResearchMate AI can suggest potential research
+        directions based on the analyzed paper and
+        retrieved literature.
 
-        These suggestions are not definitive research gaps
-        and should be validated by the researcher.
+        These are AI-generated suggestions and are not
+        definitive research gaps. They should be validated
+        through broader literature review and domain expertise.
         """
     )
 
@@ -217,7 +232,8 @@ comparison.
 if page in [
     "📄 Paper Analysis",
     "🔎 Citation Analysis",
-    "✨ Novelty Analysis"
+    "✨ Novelty Analysis",
+    "🧭 Potential Research Directions"
 ]:
 
     st.header("📤 Upload Research Paper")
@@ -247,7 +263,15 @@ if page in [
             st.session_state.faiss_index = None
             st.session_state.paper_analysis = None
             st.session_state.page_count = 0
-            st.session_state.uploaded_file_name = uploaded_file.name
+
+            # Reset Day 10 / Day 11 analysis state
+            st.session_state.literature_results = []
+            st.session_state.novelty_analysis = None
+            st.session_state.research_directions = None
+
+            st.session_state.uploaded_file_name = (
+                uploaded_file.name
+            )
 
         st.success(
             f"Uploaded: **{uploaded_file.name}**"
@@ -273,26 +297,37 @@ if page in [
                         pdf_bytes = uploaded_file.getvalue()
 
                         class UploadedPDF:
+
                             def __init__(self, data):
                                 self.data = data
 
                             def read(self):
                                 return self.data
 
-                        pdf_object = UploadedPDF(pdf_bytes)
+                        pdf_object = UploadedPDF(
+                            pdf_bytes
+                        )
 
                         # Extract PDF text
-                        text, page_count = extract_text_from_pdf(
-                            pdf_object
+                        text, page_count = (
+                            extract_text_from_pdf(
+                                pdf_object
+                            )
                         )
 
                         st.session_state.pdf_text = text
-                        st.session_state.page_count = page_count
+                        st.session_state.page_count = (
+                            page_count
+                        )
 
                         # Clean text
-                        cleaned_text = clean_text(text)
+                        cleaned_text = clean_text(
+                            text
+                        )
 
-                        st.session_state.cleaned_text = cleaned_text
+                        st.session_state.cleaned_text = (
+                            cleaned_text
+                        )
 
                         # Create chunks
                         chunks = split_text_into_chunks(
@@ -316,14 +351,18 @@ if page in [
                             st.session_state.embedding_model
                         )
 
-                        st.session_state.embeddings = embeddings
+                        st.session_state.embeddings = (
+                            embeddings
+                        )
 
                         # Create FAISS index
                         faiss_index = create_faiss_index(
                             embeddings
                         )
 
-                        st.session_state.faiss_index = faiss_index
+                        st.session_state.faiss_index = (
+                            faiss_index
+                        )
 
                         st.success(
                             "Research paper processed successfully."
@@ -338,6 +377,7 @@ if page in [
                         )
 
                         if faiss_index is not None:
+
                             st.write(
                                 f"**FAISS vectors:** "
                                 f"{faiss_index.ntotal}"
@@ -358,12 +398,14 @@ if page in [
             col1, col2, col3 = st.columns(3)
 
             with col1:
+
                 st.metric(
                     "Pages",
                     st.session_state.page_count
                 )
 
             with col2:
+
                 st.metric(
                     "Chunks",
                     len(st.session_state.chunks)
@@ -371,7 +413,11 @@ if page in [
 
             with col3:
 
-                if st.session_state.faiss_index is not None:
+                if (
+                    st.session_state.faiss_index
+                    is not None
+                ):
+
                     st.metric(
                         "FAISS Vectors",
                         st.session_state.faiss_index.ntotal
@@ -394,11 +440,15 @@ if page == "📄 Paper Analysis":
 
     else:
 
-        st.subheader("💬 Ask Questions About the Paper")
+        st.subheader(
+            "💬 Ask Questions About the Paper"
+        )
 
         question = st.text_input(
             "Enter your research question",
-            placeholder="Example: What methodology was used in the study?"
+            placeholder=(
+                "Example: What methodology was used in the study?"
+            )
         )
 
         if st.button(
@@ -425,6 +475,7 @@ if page == "📄 Paper Analysis":
                             st.session_state.gemini_client
                             is None
                         ):
+
                             st.session_state.gemini_client = (
                                 load_gemini_model()
                             )
@@ -432,7 +483,9 @@ if page == "📄 Paper Analysis":
                         # Query embedding
                         query_embedding = (
                             st.session_state.embedding_model
-                            .encode([question])[0]
+                            .encode(
+                                [question]
+                            )[0]
                         )
 
                         # Hybrid retrieval
@@ -461,14 +514,13 @@ if page == "📄 Paper Analysis":
                             prompt
                         )
 
-                        st.markdown("### 🤖 Answer")
+                        st.markdown(
+                            "### 🤖 Answer"
+                        )
 
                         st.write(answer)
 
-                        # ------------------------------------------------
                         # Retrieval evidence
-                        # ------------------------------------------------
-
                         with st.expander(
                             "🔎 View Retrieved Evidence"
                         ):
@@ -535,11 +587,11 @@ if page == "📄 Paper Analysis":
                         st.session_state.gemini_client
                         is None
                     ):
+
                         st.session_state.gemini_client = (
                             load_gemini_model()
                         )
 
-                    # Retrieve broad paper context
                     analysis_query = (
                         "research problem objectives methodology "
                         "dataset results findings contributions limitations"
@@ -547,7 +599,9 @@ if page == "📄 Paper Analysis":
 
                     query_embedding = (
                         st.session_state.embedding_model
-                        .encode([analysis_query])[0]
+                        .encode(
+                            [analysis_query]
+                        )[0]
                     )
 
                     retrieved_results = hybrid_search(
@@ -563,8 +617,10 @@ if page == "📄 Paper Analysis":
                         for result in retrieved_results
                     ]
 
-                    prompt = build_paper_analysis_prompt(
-                        retrieved_chunks
+                    prompt = (
+                        build_paper_analysis_prompt(
+                            retrieved_chunks
+                        )
                     )
 
                     analysis = generate_answer(
@@ -572,7 +628,9 @@ if page == "📄 Paper Analysis":
                         prompt
                     )
 
-                    st.session_state.paper_analysis = analysis
+                    st.session_state.paper_analysis = (
+                        analysis
+                    )
 
                 except Exception as e:
 
@@ -621,9 +679,13 @@ if page == "🔎 Citation Analysis":
                         suffix=".pdf"
                     ) as temp_pdf:
 
-                        temp_pdf.write(pdf_bytes)
+                        temp_pdf.write(
+                            pdf_bytes
+                        )
 
-                        temp_pdf_path = temp_pdf.name
+                        temp_pdf_path = (
+                            temp_pdf.name
+                        )
 
                     try:
 
@@ -638,6 +700,7 @@ if page == "🔎 Citation Analysis":
                         if os.path.exists(
                             temp_pdf_path
                         ):
+
                             os.remove(
                                 temp_pdf_path
                             )
@@ -646,13 +709,10 @@ if page == "🔎 Citation Analysis":
                         "Citation analysis completed."
                     )
 
-                    # ------------------------------------------------
-                    # Summary
-                    # ------------------------------------------------
-
                     col1, col2, col3 = st.columns(3)
 
                     with col1:
+
                         st.metric(
                             "Pages",
                             citation_result[
@@ -661,6 +721,7 @@ if page == "🔎 Citation Analysis":
                         )
 
                     with col2:
+
                         st.metric(
                             "Reference Blocks",
                             citation_result[
@@ -669,6 +730,7 @@ if page == "🔎 Citation Analysis":
                         )
 
                     with col3:
+
                         st.metric(
                             "Parsed References",
                             citation_result[
@@ -717,7 +779,9 @@ if page == "🔎 Citation Analysis":
 
 if page == "✨ Novelty Analysis":
 
-    st.title("✨ Cross-Paper Novelty Analysis")
+    st.title(
+        "✨ Cross-Paper Novelty Analysis"
+    )
 
     st.markdown(
         """
@@ -760,10 +824,6 @@ or identify a research gap.
 
     else:
 
-        # ----------------------------------------------------
-        # Literature corpus path
-        # ----------------------------------------------------
-
         literature_directory = os.path.join(
             "documents",
             "literature"
@@ -781,7 +841,7 @@ or identify a research gap.
         )
 
         # ----------------------------------------------------
-        # Build / load literature corpus
+        # Build literature corpus
         # ----------------------------------------------------
 
         if st.button(
@@ -799,6 +859,7 @@ or identify a research gap.
                         st.session_state.embedding_model
                         is None
                     ):
+
                         st.session_state.embedding_model = (
                             load_embedding_model()
                         )
@@ -817,6 +878,11 @@ or identify a research gap.
                     st.session_state.literature_corpus_path = (
                         literature_directory
                     )
+
+                    # Reset dependent analyses
+                    st.session_state.literature_results = []
+                    st.session_state.novelty_analysis = None
+                    st.session_state.research_directions = None
 
                     literature_papers = (
                         literature_corpus.get(
@@ -839,12 +905,14 @@ or identify a research gap.
                     col1, col2, col3 = st.columns(3)
 
                     with col1:
+
                         st.metric(
                             "Literature Papers",
                             len(literature_papers)
                         )
 
                     with col2:
+
                         st.metric(
                             "Literature Chunks",
                             len(literature_chunks)
@@ -872,7 +940,7 @@ or identify a research gap.
                     )
 
         # ----------------------------------------------------
-        # Display current corpus status
+        # Display corpus
         # ----------------------------------------------------
 
         if st.session_state.literature_corpus:
@@ -930,10 +998,6 @@ or identify a research gap.
                         literature_index.ntotal
                     )
 
-            # ------------------------------------------------
-            # Literature papers list
-            # ------------------------------------------------
-
             with st.expander(
                 "📚 View Literature Corpus"
             ):
@@ -948,7 +1012,8 @@ or identify a research gap.
                         f"Pages: {paper['page_count']}"
                     )
 
-                    st.markdown("---")
+                    st.markdown("---"
+                    )
 
             st.markdown("---")
 
@@ -971,21 +1036,18 @@ or identify a research gap.
 
                     try:
 
-                        # --------------------------------------------
-                        # Load Gemini
-                        # --------------------------------------------
-
                         if (
                             st.session_state.gemini_client
                             is None
                         ):
+
                             st.session_state.gemini_client = (
                                 load_gemini_model()
                             )
 
-                        # --------------------------------------------
+                        # ----------------------------------------
                         # Generate paper analysis if missing
-                        # --------------------------------------------
+                        # ----------------------------------------
 
                         if (
                             not st.session_state.paper_analysis
@@ -1039,9 +1101,9 @@ or identify a research gap.
                                 st.session_state.paper_analysis
                             )
 
-                        # --------------------------------------------
-                        # Create literature retrieval query
-                        # --------------------------------------------
+                        # ----------------------------------------
+                        # Retrieve literature
+                        # ----------------------------------------
 
                         literature_query = (
                             """
@@ -1051,15 +1113,13 @@ or identify a research gap.
                             """
                         )
 
-                        # --------------------------------------------
-                        # Search separate literature corpus
-                        # --------------------------------------------
-
-                        literature_results = search_literature(
-                            literature_corpus,
-                            literature_query,
-                            st.session_state.embedding_model,
-                            top_k=7
+                        literature_results = (
+                            search_literature(
+                                literature_corpus,
+                                literature_query,
+                                st.session_state.embedding_model,
+                                top_k=7
+                            )
                         )
 
                         if not literature_results:
@@ -1073,9 +1133,14 @@ or identify a research gap.
 
                         else:
 
-                            # ----------------------------------------
+                            # Save literature results
+                            st.session_state.literature_results = (
+                                literature_results
+                            )
+
+                            # ------------------------------------
                             # Build novelty prompt
-                            # ----------------------------------------
+                            # ------------------------------------
 
                             novelty_prompt = (
                                 build_novelty_analysis_prompt(
@@ -1084,15 +1149,26 @@ or identify a research gap.
                                 )
                             )
 
-                            # ----------------------------------------
+                            # ------------------------------------
                             # Generate novelty analysis
-                            # ----------------------------------------
+                            # ------------------------------------
 
                             novelty_analysis = (
                                 generate_answer(
                                     st.session_state.gemini_client,
                                     novelty_prompt
                                 )
+                            )
+
+                            st.session_state.novelty_analysis = (
+                                novelty_analysis
+                            )
+
+                            # A new novelty analysis means
+                            # previous research directions
+                            # should be regenerated.
+                            st.session_state.research_directions = (
+                                None
                             )
 
                             st.success(
@@ -1111,9 +1187,9 @@ or identify a research gap.
 
                             st.markdown("---")
 
-                            # ----------------------------------------
+                            # ------------------------------------
                             # Retrieved literature evidence
-                            # ----------------------------------------
+                            # ------------------------------------
 
                             st.subheader(
                                 "📚 Retrieved Literature Evidence"
@@ -1203,26 +1279,236 @@ if page == "🧭 Potential Research Directions":
 
     st.markdown(
         """
-This module is intended to suggest **potential research
-directions** based on analyzed literature.
+This module suggests **potential research directions**
+based on the uploaded paper and retrieved literature.
 
 ResearchMate AI does not claim to definitively identify
 or prove a research gap.
+
+The suggestions are AI-generated observations that
+should be validated through broader literature review
+and domain expertise.
 """
     )
 
     st.info(
         """
-        🚧 This module is currently under development.
+        **Researcher Validation**
 
-        Future versions will analyze the uploaded paper
-        together with retrieved literature and generate
-        AI-assisted research opportunity suggestions.
-
-        All suggestions will require validation through
-        broader literature review and domain expertise.
+        Potential research directions are generated from
+        the supplied paper analysis, cross-paper comparison,
+        and retrieved literature. They should not be treated
+        as established research opportunities without further
+        validation.
         """
     )
+
+    # --------------------------------------------------------
+    # Check uploaded paper
+    # --------------------------------------------------------
+
+    if not st.session_state.chunks:
+
+        st.warning(
+            "Please upload and process a research paper first."
+        )
+
+    elif not st.session_state.literature_corpus:
+
+        st.warning(
+            """
+            The separate literature corpus is not loaded.
+
+            Go to **✨ Novelty Analysis** and click
+            **🔄 Build Literature Corpus** first.
+            """
+        )
+
+    elif not st.session_state.novelty_analysis:
+
+        st.warning(
+            """
+            Cross-paper novelty analysis has not been generated yet.
+
+            Go to **✨ Novelty Analysis** and click
+            **✨ Analyze Potential Novelty** first.
+            """
+        )
+
+    elif not st.session_state.literature_results:
+
+        st.warning(
+            """
+            Literature evidence is not available.
+
+            Please run the cross-paper novelty analysis
+            first so ResearchMate AI can use the retrieved
+            literature.
+            """
+        )
+
+    else:
+
+        st.success(
+            "Required paper analysis and literature evidence are ready."
+        )
+
+        st.markdown("---")
+
+        st.subheader(
+            "🧭 Generate Potential Research Directions"
+        )
+
+        st.write(
+            """
+            ResearchMate AI will use the existing paper analysis,
+            novelty analysis, and retrieved literature evidence
+            to suggest research directions.
+            """
+        )
+
+        if st.button(
+            "🧭 Generate Research Directions",
+            key="generate_research_directions"
+        ):
+
+            with st.spinner(
+                "Generating potential research directions..."
+            ):
+
+                try:
+
+                    # --------------------------------------------
+                    # Load Gemini
+                    # --------------------------------------------
+
+                    if (
+                        st.session_state.gemini_client
+                        is None
+                    ):
+
+                        st.session_state.gemini_client = (
+                            load_gemini_model()
+                        )
+
+                    # --------------------------------------------
+                    # Build grounded research direction prompt
+                    # --------------------------------------------
+
+                    research_direction_prompt = (
+                        build_research_direction_prompt(
+                            st.session_state.paper_analysis,
+                            st.session_state.novelty_analysis,
+                            st.session_state.literature_results
+                        )
+                    )
+
+                    # --------------------------------------------
+                    # Generate directions
+                    # --------------------------------------------
+
+                    research_directions = (
+                        generate_answer(
+                            st.session_state.gemini_client,
+                            research_direction_prompt
+                        )
+                    )
+
+                    st.session_state.research_directions = (
+                        research_directions
+                    )
+
+                    st.success(
+                        "Potential research directions generated successfully."
+                    )
+
+                except Exception as e:
+
+                    st.error(
+                        f"Error generating research directions: {e}"
+                    )
+
+        # --------------------------------------------------------
+        # Display generated directions
+        # --------------------------------------------------------
+
+        if st.session_state.research_directions:
+
+            st.markdown("---")
+
+            st.subheader(
+                "🧭 Suggested Potential Research Directions"
+            )
+
+            st.markdown(
+                st.session_state.research_directions
+            )
+
+            st.markdown("---")
+
+            st.warning(
+                """
+                **Researcher Validation Required**
+
+                These are AI-generated potential research
+                directions based on the supplied paper analysis
+                and retrieved literature.
+
+                They should be validated through broader
+                literature review, domain expertise, and further
+                research before being treated as established
+                research opportunities.
+                """
+            )
+
+            # ----------------------------------------------------
+            # Show evidence used by the agent
+            # ----------------------------------------------------
+
+            st.markdown("---")
+
+            st.subheader(
+                "📚 Literature Evidence Used"
+            )
+
+            st.caption(
+                """
+                These are the same retrieved literature results
+                used during the cross-paper novelty analysis.
+                """
+            )
+
+            for i, result in enumerate(
+                st.session_state.literature_results,
+                start=1
+            ):
+
+                with st.expander(
+                    f"{i}. {result['source']}"
+                ):
+
+                    st.write(
+                        f"**Source:** "
+                        f"{result['source']}"
+                    )
+
+                    st.write(
+                        f"**Pages:** "
+                        f"{result['page_count']}"
+                    )
+
+                    st.write(
+                        f"**Final Score:** "
+                        f"{result['final_score']:.4f}"
+                    )
+
+                    st.markdown(
+                        "**Retrieved Content:**"
+                    )
+
+                    st.text(
+                        result["chunk"]
+                    )
 
 
 # ============================================================
