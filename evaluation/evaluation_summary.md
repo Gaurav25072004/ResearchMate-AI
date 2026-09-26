@@ -345,7 +345,7 @@ The Day 13 evaluation activities were completed successfully.
 Evaluation Plan                    PASS
 Retrieval Evaluation               PASS
 Paper Analysis Evaluation          PASS
-Citation Analysis Evaluation      PASS
+Citation Analysis Evaluation       PASS
 Cross-Paper Evaluation             PASS
 Research Directions Evaluation     PASS
 Research Assessment Evaluation     PASS
