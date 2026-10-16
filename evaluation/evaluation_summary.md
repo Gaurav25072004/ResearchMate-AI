@@ -1,42 +1,38 @@
-# ResearchMate AI — Day 13 Evaluation Summary
+# ResearchMate AI — Evaluation Summary
 
 ## 1. Purpose
 
-Day 13 focuses on evaluating the reliability and structural correctness of the major ResearchMate AI modules.
+This document summarizes the evaluation activities performed for ResearchMate AI, including the initial Day 13 evaluation and the Day 15 regression-test rerun.
 
-The evaluation checks whether the implemented modules:
+The evaluations check whether the implemented modules:
 
-- produce the expected outputs,
-- contain the required information,
-- follow the defined safety constraints,
-- use evidence appropriately,
-- maintain separation between the uploaded paper and literature corpus,
+- produce the expected output structure;
+- include required information;
+- follow defined prompt safeguards;
+- provide source information where expected;
+- maintain separation between the uploaded paper and the literature corpus;
 - avoid unsupported claims.
 
-The evaluation is intended to provide a structured verification of the implemented system.
+**Evaluation limitation:** Passing these tests does not establish that every generated answer is scientifically accurate, that every retrieved passage is relevant, or that a suggested research direction is original.
 
----
+## 2. Evaluation Components
 
-# 2. Evaluation Components
-
-The following components were evaluated during Day 13:
+The following components were evaluated:
 
 1. Semantic and Hybrid Retrieval
 2. Research Paper Analysis
 3. Citation Analysis
-4. Cross-Paper Novelty Analysis
+4. Cross-Paper Analysis
 5. Potential Research Directions
 6. Research Assessment
 
-In addition, an overall evaluation plan was created to document the testing methodology.
+The evaluation plan is documented in `evaluation_plan.md`.
 
----
-
-# 3. Evaluation Results
+## 3. Evaluation Results
 
 | Evaluation Component | Test File | Result |
 |---|---|---|
-| Evaluation Plan | `evaluation_plan.md` | PASS |
+| Evaluation Plan | `evaluation_plan.md` | PASS — documented |
 | Semantic / Hybrid Retrieval | `test_retrieval_evaluation.py` | PASS |
 | Research Paper Analysis | `test_paper_analysis_evaluation.py` | PASS |
 | Citation Analysis | `test_citation_evaluation.py` | PASS |
@@ -44,68 +40,46 @@ In addition, an overall evaluation plan was created to document the testing meth
 | Potential Research Directions | `test_research_directions_evaluation.py` | PASS |
 | Research Assessment | `test_research_assessment_evaluation.py` | PASS |
 
-All planned Day 13 evaluation components completed successfully.
+All six evaluation scripts passed when run individually and during the combined Day 15 regression-test run.
 
----
+The results establish that the tested functionality and prompt requirements passed the implemented checks. They do not establish complete scientific correctness or optimal retrieval relevance.
 
-# 4. Retrieval Evaluation
+## 4. Retrieval Evaluation
 
-## Test File
+**Test file:** `test_retrieval_evaluation.py`
 
-`evaluation/test_retrieval_evaluation.py`
+### Purpose
 
-## Purpose
+The evaluation checks PDF processing, text chunking, embedding generation, FAISS indexing, and retrieval using research-related queries.
 
-The retrieval evaluation verifies that ResearchMate AI can:
+### Test paper and results
 
-- process the uploaded research paper,
-- split the paper into chunks,
-- generate embeddings,
-- create a FAISS index,
-- perform semantic retrieval,
-- perform hybrid retrieval,
-- return relevant chunks for research-related questions.
-
-## Test Paper
-
-The evaluation used the uploaded research paper:
-
-`2506.22026v1.pdf`
-
-## Verified Results
+Test paper: `2506.22026v1.pdf`
 
 - Pages processed: 18
 - Chunks generated: 48
 - Embeddings generated: 48
 - FAISS vectors: 48
 
-The following queries were tested:
+### Queries tested
 
-1. `What methodology was used in the study?`
-2. `What dataset or data was used?`
-3. `What were the main results of the research?`
+1. What methodology was used in the study?
+2. What dataset or data was used?
+3. What were the main results of the research?
 
 All three queries returned retrieval results successfully.
 
-## Result
+### Observed limitation
 
-**PASS**
+Some returned passages were less directly relevant to the question than desired. For example, dataset-related retrieval included a passage focused on prompt sensitivity, while a passage containing explicit dataset details appeared lower in the results. Results-related retrieval also included passages that were not necessarily the most direct summary of the paper's main findings.
 
----
+**Result: PASS**, for the checks implemented in the evaluation script. Retrieval relevance remains an area for improvement.
 
-# 5. Research Paper Analysis Evaluation
+## 5. Research Paper Analysis Evaluation
 
-## Test File
+**Test file:** `test_paper_analysis_evaluation.py`
 
-`evaluation/test_paper_analysis_evaluation.py`
-
-## Purpose
-
-The evaluation verifies that the paper-analysis prompt requires the expected structured research-paper analysis.
-
-## Required Categories
-
-The evaluation checked for:
+The evaluation checked the required sections:
 
 1. Research Problem
 2. Research Objectives
@@ -115,43 +89,19 @@ The evaluation checked for:
 6. Main Contributions
 7. Limitations
 
-## Additional Checks
+Additional checks verified non-empty sections and safeguards against definitive research-gap claims and numerical research-quality scoring.
 
-The evaluation also checked that the analysis:
+**Result: PASS**
 
-- contains non-empty sections,
-- does not claim to prove a research gap,
-- does not produce a research-quality score.
+This validates the tested prompt structure and safeguards, not the factual accuracy of every possible generated analysis.
 
-## Result
+## 6. Citation Analysis Evaluation
 
-**PASS**
+**Test file:** `test_citation_evaluation.py`
 
----
+The evaluation verified that citation analysis executes and returns the expected information.
 
-# 6. Citation Analysis Evaluation
-
-## Test File
-
-`evaluation/test_citation_evaluation.py`
-
-## Purpose
-
-The citation evaluation verifies that the citation-analysis module can process the uploaded research paper and extract citation/reference information.
-
-## Verified Results
-
-The evaluation confirmed:
-
-- citation analysis executes successfully,
-- page count is available,
-- reference blocks are detected,
-- total references are detected,
-- extracted references are available,
-- parsed references are available,
-- parsed references contain usable text.
-
-## Verified Paper Statistics
+### Observed results
 
 - Pages: 18
 - Reference blocks: 101
@@ -159,46 +109,30 @@ The evaluation confirmed:
 - Extracted references: 57
 - Parsed references: 57
 
-## Result
+The evaluation also checked that the parsed references contain usable text.
 
-**PASS**
+**Result: PASS**
 
----
+These counts describe the tested document and do not independently establish that every reference was parsed correctly or completely.
 
-# 7. Cross-Paper Analysis Evaluation
+## 7. Cross-Paper Analysis Evaluation
 
-## Test File
+**Test file:** `test_cross_paper_evaluation.py`
 
-`evaluation/test_cross_paper_evaluation.py`
-
-## Purpose
-
-The cross-paper evaluation verifies that ResearchMate AI can compare the uploaded paper with a separate literature corpus.
-
-The evaluation also checks the safety constraints used by the Novelty Analysis Agent.
-
-## Literature Corpus
-
-The evaluation used the separate literature corpus containing:
+The evaluation used a separate literature corpus containing:
 
 - `2026.eacl-long.121.pdf`
 - `2026.findings-acl.1607.pdf`
 
-## Verified Corpus
+### Corpus results
 
 - Literature papers: 2
 - Literature chunks: 250
 - FAISS vectors: 250
 
-The evaluation confirmed that literature retrieval returns:
+The evaluation verified that retrieval returned non-empty chunks and source information from the separate literature corpus.
 
-- literature source information,
-- non-empty retrieved chunks,
-- evidence from papers separate from the uploaded paper.
-
-## Required Analysis Sections
-
-The evaluation checked for:
+It also checked the expected analysis sections:
 
 - Research Focus
 - Similarity Evidence
@@ -206,33 +140,19 @@ The evaluation checked for:
 - Potentially Distinctive Aspects
 - Researcher Validation
 
-## Safety Checks
+Prompt safeguards against definitive originality and research-gap claims were also checked.
 
-The evaluation confirmed that the prompt instructs the system:
+### Observed limitation
 
-- not to claim that the uploaded paper is definitely novel or non-novel,
-- not to claim that a research gap has been proven or definitively identified,
-- not to make unsupported claims about originality.
+Some retrieved chunks appeared to contain bibliography or reference-list content. This suggests that PDF section detection and retrieval filtering may need improvement to prioritize substantive research content.
 
-## Result
+**Result: PASS**, for the implemented checks. Cross-paper retrieval relevance requires further evaluation.
 
-**PASS**
+## 8. Potential Research Directions Evaluation
 
----
+**Test file:** `test_research_directions_evaluation.py`
 
-# 8. Potential Research Directions Evaluation
-
-## Test File
-
-`evaluation/test_research_directions_evaluation.py`
-
-## Purpose
-
-The evaluation verifies that the Research Direction Agent is designed to suggest potential research directions rather than definitively identify a research gap.
-
-## Required Structure
-
-The evaluation checked for:
+The evaluation checked the expected output structure:
 
 - Potential Research Directions
 - Potential Direction
@@ -240,50 +160,19 @@ The evaluation checked for:
 - Supporting Evidence
 - Research Question
 
-The prompt also requires:
+It also checked the expected range of three to five suggestions and safeguards requiring evidence-based, appropriately qualified suggestions.
 
-- 3 to 5 potential research directions,
-- evidence-based suggestions,
-- use of supplied information only,
-- no unsupported facts,
-- connection between each direction and evidence.
+The prompt requires researchers to validate suggestions through broader literature review, domain expertise, and further research.
 
-## Safety Checks
+**Result: PASS**
 
-The evaluation confirmed that the agent is instructed:
+The test verifies the prompt's requirements; it does not prove that any proposed direction is genuinely novel or unexplored.
 
-- not to prove or definitively identify a research gap,
-- not to claim that a topic is completely unexplored,
-- not to claim that a proposed direction is novel,
-- to connect suggestions with supplied evidence.
+## 9. Research Assessment Evaluation
 
-## Researcher Validation
+**Test file:** `test_research_assessment_evaluation.py`
 
-The evaluation also confirmed that the output requires validation through:
-
-- broader literature review,
-- domain expertise,
-- further research.
-
-## Result
-
-**PASS**
-
----
-
-# 9. Research Assessment Evaluation
-
-## Test File
-
-`evaluation/test_research_assessment_evaluation.py`
-
-## Purpose
-
-The evaluation verifies that the Research Assessment Agent provides a structured assessment of information reported in the paper without presenting the assessment as an objective research-quality score.
-
-## Required Assessment Categories
-
-The evaluation checked for all eight categories:
+The evaluation checked all eight assessment categories:
 
 1. Research Problem Clarity
 2. Research Objective Clarity
@@ -294,58 +183,49 @@ The evaluation checked for all eight categories:
 7. Limitation Reporting
 8. Citation / Reference Information
 
-## Assessment Classifications
-
-The evaluation confirmed the required classifications:
+The expected classifications were:
 
 - Clearly Reported
 - Partially Reported
 - Insufficient Information
 
-## Evidence Requirement
+Additional checks covered evidence requirements, citation integration, the overall summary, and safeguards against numerical scoring, ranking, unsupported novelty claims, and unsupported claims of scientific validity.
 
-The assessment must provide evidence supporting each assessment.
+**Result: PASS**
 
-## Citation Integration
+The assessment describes how information is reported in the supplied paper; it should not be interpreted as an objective measure of scientific quality.
 
-The evaluation confirmed that citation/reference information is incorporated into the assessment.
+## 10. Day 15 Regression Test
 
-## Overall Summary
+All six evaluation scripts were run individually and then executed through a combined PowerShell loop.
 
-The assessment includes an overall summary covering:
+| Test | Result |
+|---|---|
+| Retrieval Evaluation | PASS |
+| Paper Analysis Evaluation | PASS |
+| Citation Analysis Evaluation | PASS |
+| Cross-Paper Evaluation | PASS |
+| Research Directions Evaluation | PASS |
+| Research Assessment Evaluation | PASS |
 
-- clearly reported aspects,
-- partially reported aspects,
-- aspects for which sufficient information is unavailable.
+The combined run completed all six scripts without a reported test failure.
 
-## Safety Checks
+The PDF-processing deprecation message and Hugging Face authentication notice observed during execution were warnings, not evaluation failures.
 
-The evaluation confirmed that the assessment:
+## 11. Overall Evaluation Status
 
-- is not presented as an objective measurement of research quality,
-- does not claim that the paper is good or bad,
-- does not claim that the research is novel,
-- does not claim scientific validity without supporting evidence,
-- does not provide a numerical research-quality score,
-- does not rank the paper.
+**Overall status: All six implemented evaluation scripts passed.**
 
-## Result
+The evaluation provides evidence that the tested workflows, output structures, and prompt safeguards function as expected for the tested cases.
 
-**PASS**
+Remaining limitations include:
 
----
+- improving the relevance of retrieved passages;
+- reducing retrieval of bibliography content;
+- validating the factual accuracy of generated answers;
+- testing additional papers and varied document formats;
+- assessing output quality with broader test cases and researcher review.
 
-# 10. Overall Evaluation Status
+ResearchMate AI suggests potential research directions based on available evidence. These suggestions must be validated by researchers through domain expertise and further literature review.
 
-The Day 13 evaluation activities were completed successfully.
-
-### Final Status
-
-```text
-Evaluation Plan                    PASS
-Retrieval Evaluation               PASS
-Paper Analysis Evaluation          PASS
-Citation Analysis Evaluation       PASS
-Cross-Paper Evaluation             PASS
-Research Directions Evaluation     PASS
-Research Assessment Evaluation     PASS
+The evaluation does not establish objective research quality, scientific validity, originality, publication potential, or the existence of a definitive research gap.
