@@ -2,84 +2,114 @@
 
 ## 1. Purpose
 
-This document summarizes the evaluation activities performed for ResearchMate AI, including the initial Day 13 evaluation and the Day 15 regression-test rerun.
+This document summarizes the functional evaluation and reliability testing performed for ResearchMate AI.
 
-The evaluations check whether the implemented modules:
+The evaluation focuses on verifying the operation of the implemented document-processing, retrieval, research-analysis, citation-analysis, cross-paper-analysis, potential research directions, and research-assessment modules.
 
-- produce the expected output structure;
-- include required information;
-- follow defined prompt safeguards;
-- provide source information where expected;
-- maintain separation between the uploaded paper and the literature corpus;
-- avoid unsupported claims.
+The recorded PASS results indicate that the tested workflows completed successfully under the selected test conditions. They do not establish the scientific validity, originality, or accuracy of every generated output.
 
-**Evaluation limitation:** Passing these tests does not establish that every generated answer is scientifically accurate, that every retrieved passage is relevant, or that a suggested research direction is original.
+## 2. Evaluation Scope
 
-## 2. Evaluation Components
+The evaluation covers the following components:
 
-The following components were evaluated:
+1. PDF processing and text extraction
+2. Text cleaning, section detection, and chunking
+3. Semantic and hybrid retrieval
+4. Structured research paper analysis
+5. Citation analysis
+6. Cross-paper analysis
+7. Potential Research Directions generation
+8. Research Assessment
+9. Input validation and edge-case handling
+10. Regression testing across the implemented modules
 
-1. Semantic and Hybrid Retrieval
-2. Research Paper Analysis
-3. Citation Analysis
-4. Cross-Paper Analysis
-5. Potential Research Directions
-6. Research Assessment
+## 3. Evaluation Environment
 
-The evaluation plan is documented in `evaluation_plan.md`.
+ResearchMate AI is implemented using Python and integrates document-processing, embedding, vector-search, and language-model components.
 
-## 3. Evaluation Results
+The tested workflow uses:
 
-| Evaluation Component | Test File | Result |
-|---|---|---|
-| Evaluation Plan | `evaluation_plan.md` | PASS — documented |
-| Semantic / Hybrid Retrieval | `test_retrieval_evaluation.py` | PASS |
-| Research Paper Analysis | `test_paper_analysis_evaluation.py` | PASS |
-| Citation Analysis | `test_citation_evaluation.py` | PASS |
-| Cross-Paper Analysis | `test_cross_paper_evaluation.py` | PASS |
-| Potential Research Directions | `test_research_directions_evaluation.py` | PASS |
-| Research Assessment | `test_research_assessment_evaluation.py` | PASS |
+- Python for application logic and evaluation scripts
+- PyMuPDF for PDF text extraction
+- Sentence Transformers for text embeddings
+- FAISS for vector indexing and similarity retrieval
+- Gemini integration for language-model-based analysis
+- Streamlit for the user interface
 
-All six evaluation scripts passed when run individually and during the combined Day 15 regression-test run.
+The evaluation uses selected research papers and controlled tests. The results should be interpreted within this scope.
 
-The results establish that the tested functionality and prompt requirements passed the implemented checks. They do not establish complete scientific correctness or optimal retrieval relevance.
+## 4. Evaluation Approach
 
-## 4. Retrieval Evaluation
+The evaluation uses functional tests, output-structure checks, input-validation tests, and regression tests.
 
-**Test file:** `test_retrieval_evaluation.py`
+The tests verify whether:
 
-### Purpose
+- Research documents can be processed.
+- Text chunks and embeddings can be generated.
+- FAISS indexes can be created.
+- Retrieval queries return results.
+- Analysis outputs contain the required sections.
+- Citation information can be extracted and represented.
+- Cross-paper analysis uses literature evidence and source information.
+- Potential research directions include the required structure and researcher-validation guidance.
+- Research Assessment includes the required categories and avoids numerical research-quality scoring.
+- Invalid chunking parameters are rejected.
+- Previously implemented evaluation workflows continue to pass after code changes.
 
-The evaluation checks PDF processing, text chunking, embedding generation, FAISS indexing, and retrieval using research-related queries.
+These tests primarily establish functional behavior. They do not constitute a comprehensive scientific or expert evaluation.
 
-### Test paper and results
+## 5. Semantic and Hybrid Retrieval Evaluation
 
-Test paper: `2506.22026v1.pdf`
+### Objective
 
-- Pages processed: 18
-- Chunks generated: 48
-- Embeddings generated: 48
-- FAISS vectors: 48
+Verify the processing of an uploaded research paper and the retrieval of relevant text chunks for research-related questions.
 
-### Queries tested
+### Test Configuration
+
+| Parameter | Recorded result |
+|---|---|
+| Test document | `2506.22026v1.pdf` |
+| Pages processed | 18 |
+| Text chunks generated | 48 |
+| Embeddings generated | 48 |
+| FAISS vectors created | 48 |
+| Test queries | 3 |
+| Results returned per query | 5 |
+
+### Queries Tested
 
 1. What methodology was used in the study?
 2. What dataset or data was used?
 3. What were the main results of the research?
 
-All three queries returned retrieval results successfully.
+### Results
 
-### Observed limitation
+| Evaluation item | Result |
+|---|---|
+| Paper processing | PASS |
+| Embedding generation | PASS |
+| FAISS index creation | PASS |
+| Methodology query | PASS |
+| Dataset query | PASS |
+| Main results query | PASS |
 
-Some returned passages were less directly relevant to the question than desired. For example, dataset-related retrieval included a passage focused on prompt sensitivity, while a passage containing explicit dataset details appeared lower in the results. Results-related retrieval also included passages that were not necessarily the most direct summary of the paper's main findings.
+**Overall status: PASS**
 
-**Result: PASS**, for the checks implemented in the evaluation script. Retrieval relevance remains an area for improvement.
+### Observations
 
-## 5. Research Paper Analysis Evaluation
+All three test queries returned five results. However, the retrieved passages were not always the most directly relevant passages for the question. For example, some dataset-related results contained prompt-sensitivity or experimental discussion, while some results included paper-title and author information.
 
-**Test file:** `test_paper_analysis_evaluation.py`
+Therefore, the evaluation confirms that retrieval completed successfully, but it does not establish consistently high retrieval relevance or answer accuracy.
 
-The evaluation checked the required sections:
+Further improvements may include better section-aware retrieval, more effective ranking, and filtering of title or bibliography content when it is not relevant to the query.
+
+## 6. Structured Research Paper Analysis Evaluation
+
+### Objective
+
+Verify that the research paper analysis output contains the expected sections and follows the project's terminology and safety constraints.
+
+### Required Sections
 
 1. Research Problem
 2. Research Objectives
@@ -89,50 +119,79 @@ The evaluation checked the required sections:
 6. Main Contributions
 7. Limitations
 
-Additional checks verified non-empty sections and safeguards against definitive research-gap claims and numerical research-quality scoring.
+### Results
 
-**Result: PASS**
+| Evaluation item | Result |
+|---|---|
+| Required headings present | PASS |
+| Section content present | PASS |
+| Prohibited definitive research-gap claims absent from the tested output | PASS |
+| Numerical research-quality score absent | PASS |
 
-This validates the tested prompt structure and safeguards, not the factual accuracy of every possible generated analysis.
+**Overall status: PASS**
 
-## 6. Citation Analysis Evaluation
+The test confirms that the checked output contains the expected structure. It does not independently verify the factual correctness or completeness of every generated statement.
 
-**Test file:** `test_citation_evaluation.py`
+## 7. Citation Analysis Evaluation
 
-The evaluation verified that citation analysis executes and returns the expected information.
+### Objective
 
-### Observed results
+Verify that the citation-analysis module extracts reference information from a research paper and returns the expected result fields.
 
-- Pages: 18
-- Reference blocks: 101
-- Total references: 57
-- Extracted references: 57
-- Parsed references: 57
+### Test Results
 
-The evaluation also checked that the parsed references contain usable text.
+| Parameter | Recorded result |
+|---|---:|
+| Test document | `2506.22026v1.pdf` |
+| Pages detected | 18 |
+| Reference blocks detected | 101 |
+| Total references | 57 |
+| Extracted reference entries | 57 |
+| Parsed reference entries | 57 |
 
-**Result: PASS**
+### Verified Result Fields
 
-These counts describe the tested document and do not independently establish that every reference was parsed correctly or completely.
+- `page_count`
+- `reference_blocks`
+- `total_references`
+- `references`
+- `parsed_references`
 
-## 7. Cross-Paper Analysis Evaluation
+**Overall status: PASS**
 
-**Test file:** `test_cross_paper_evaluation.py`
+The test confirmed that the expected fields were available and that reference entries were returned.
 
-The evaluation used a separate literature corpus containing:
+The reported counts demonstrate the output of this test run. They do not establish that every reference was extracted perfectly or that every parsed reference is bibliographically complete and accurate.
 
-- `2026.eacl-long.121.pdf`
-- `2026.findings-acl.1607.pdf`
+## 8. Cross-Paper Analysis Evaluation
 
-### Corpus results
+### Objective
 
-- Literature papers: 2
-- Literature chunks: 250
-- FAISS vectors: 250
+Verify that ResearchMate AI can build a separate literature corpus, retrieve literature passages, and construct a cross-paper analysis prompt with source information and appropriate safeguards.
 
-The evaluation verified that retrieval returned non-empty chunks and source information from the separate literature corpus.
+### Test Configuration
 
-It also checked the expected analysis sections:
+| Parameter | Recorded result |
+|---|---|
+| Literature papers | 2 |
+| Files | `2026.eacl-long.121.pdf`, `2026.findings-acl.1607.pdf` |
+| Text chunks generated | 254 |
+| FAISS vectors created | 254 |
+
+### Evaluation Results
+
+| Evaluation item | Result |
+|---|---|
+| Literature corpus availability | PASS |
+| Embedding model loading | PASS |
+| Literature corpus construction | PASS |
+| Literature retrieval | PASS |
+| Uploaded-paper context | PASS |
+| Literature evidence and source handling | PASS |
+| Required analysis sections | PASS |
+| Novelty-related safeguards | PASS |
+
+### Required Analysis Sections
 
 - Research Focus
 - Similarity Evidence
@@ -140,92 +199,222 @@ It also checked the expected analysis sections:
 - Potentially Distinctive Aspects
 - Researcher Validation
 
-Prompt safeguards against definitive originality and research-gap claims were also checked.
+**Overall status: PASS**
 
-### Observed limitation
+### Observations
 
-Some retrieved chunks appeared to contain bibliography or reference-list content. This suggests that PDF section detection and retrieval filtering may need improvement to prioritize substantive research content.
+The retrieval test returned literature passages from both available papers. Some retrieved passages contained bibliography material, including reference entries that were not directly relevant to the analysis query.
 
-**Result: PASS**, for the implemented checks. Cross-paper retrieval relevance requires further evaluation.
+This indicates that the corpus construction and retrieval workflow operates, while bibliography filtering and retrieval relevance remain potential improvement areas.
 
-## 8. Potential Research Directions Evaluation
+Cross-paper analysis can support the examination of similarities and differences between papers. It does not prove whether a contribution is objectively novel or whether a genuine research gap exists.
 
-**Test file:** `test_research_directions_evaluation.py`
+## 9. Potential Research Directions Evaluation
 
-The evaluation checked the expected output structure:
+### Objective
 
-- Potential Research Directions
-- Potential Direction
-- Reasoning
-- Supporting Evidence
-- Research Question
+Verify the structure and safeguards of the prompt used to generate potential research directions based on research literature.
 
-It also checked the expected range of three to five suggestions and safeguards requiring evidence-based, appropriately qualified suggestions.
+### Verified Requirements
 
-The prompt requires researchers to validate suggestions through broader literature review, domain expertise, and further research.
-
-**Result: PASS**
-
-The test verifies the prompt's requirements; it does not prove that any proposed direction is genuinely novel or unexplored.
-
-## 9. Research Assessment Evaluation
-
-**Test file:** `test_research_assessment_evaluation.py`
-
-The evaluation checked all eight assessment categories:
-
-1. Research Problem Clarity
-2. Research Objective Clarity
-3. Methodology Reporting
-4. Dataset / Data Reporting
-5. Results / Findings Reporting
-6. Contribution Reporting
-7. Limitation Reporting
-8. Citation / Reference Information
-
-The expected classifications were:
-
-- Clearly Reported
-- Partially Reported
-- Insufficient Information
-
-Additional checks covered evidence requirements, citation integration, the overall summary, and safeguards against numerical scoring, ranking, unsupported novelty claims, and unsupported claims of scientific validity.
-
-**Result: PASS**
-
-The assessment describes how information is reported in the supplied paper; it should not be interpreted as an objective measure of scientific quality.
-
-## 10. Day 15 Regression Test
-
-All six evaluation scripts were run individually and then executed through a combined PowerShell loop.
-
-| Test | Result |
+| Requirement | Result |
 |---|---|
-| Retrieval Evaluation | PASS |
-| Paper Analysis Evaluation | PASS |
-| Citation Analysis Evaluation | PASS |
-| Cross-Paper Evaluation | PASS |
-| Research Directions Evaluation | PASS |
-| Research Assessment Evaluation | PASS |
+| Potential Research Directions output section | PASS |
+| Potential Direction field | PASS |
+| Reasoning field | PASS |
+| Supporting Evidence field | PASS |
+| Research Question field | PASS |
+| Requirement to suggest 3–5 directions | PASS |
+| Evidence-grounding instructions | PASS |
+| Research-gap and novelty safeguards | PASS |
+| Researcher-validation instructions | PASS |
+| Literature-source handling | PASS |
 
-The combined run completed all six scripts without a reported test failure.
+**Overall status: PASS**
 
-The PDF-processing deprecation message and Hugging Face authentication notice observed during execution were warnings, not evaluation failures.
+The evaluation confirms that the prompt construction includes the expected structure and instructions.
 
-## 11. Overall Evaluation Status
+The test does not establish that every generated direction is feasible, original, scientifically useful, or genuinely underexplored. Suggestions must be checked by researchers through domain knowledge and further literature review.
 
-**Overall status: All six implemented evaluation scripts passed.**
+The module is intended to suggest **potential research directions**, not to identify or prove definitive research gaps.
 
-The evaluation provides evidence that the tested workflows, output structures, and prompt safeguards function as expected for the tested cases.
+## 10. Research Assessment Evaluation
 
-Remaining limitations include:
+### Objective
 
-- improving the relevance of retrieved passages;
-- reducing retrieval of bibliography content;
-- validating the factual accuracy of generated answers;
-- testing additional papers and varied document formats;
-- assessing output quality with broader test cases and researcher review.
+Verify the structure and safeguards of the Research Assessment module.
 
-ResearchMate AI suggests potential research directions based on available evidence. These suggestions must be validated by researchers through domain expertise and further literature review.
+### Assessment Categories
 
-The evaluation does not establish objective research quality, scientific validity, originality, publication potential, or the existence of a definitive research gap.
+1. Research problem clarity
+2. Research objective clarity
+3. Methodology reporting
+4. Dataset / data reporting
+5. Results / findings reporting
+6. Contribution reporting
+7. Limitation reporting
+8. Citation / reference information
+
+### Verified Requirements
+
+| Requirement | Result |
+|---|---|
+| Research Assessment section | PASS |
+| All eight assessment categories | PASS |
+| Required reporting classifications | PASS |
+| Evidence-based assessment instructions | PASS |
+| Citation-analysis integration | PASS |
+| Overall assessment summary | PASS |
+| Research-quality safeguards | PASS |
+| Researcher-validation instructions | PASS |
+| No numerical score or ranking | PASS |
+
+The reporting classifications checked by the test were:
+
+- Clearly reported
+- Partially reported
+- Insufficient information
+
+**Overall status: PASS**
+
+The evaluation confirms the expected assessment structure and safeguards. It does not establish that the generated assessment is equivalent to expert peer review or a formal scientific evaluation.
+
+## 11. Day 16: Text-Processing Edge-Case Evaluation
+
+### Objective
+
+Check the handling of invalid chunking parameters, valid configurations, empty inputs, and chunk-overlap behavior.
+
+### 11.1 Invalid Parameter Tests
+
+| Test case | Expected behavior | Result |
+|---|---|---|
+| Zero chunk size | Reject with validation error | PASS |
+| Negative chunk size | Reject with validation error | PASS |
+| Overlap equal to chunk size | Reject with validation error | PASS |
+| Negative overlap | Reject with validation error | PASS |
+| String chunk size | Reject with validation error | PASS |
+| Floating-point chunk size | Reject with validation error | PASS |
+| String overlap | Reject with validation error | PASS |
+| Floating-point overlap | Reject with validation error | PASS |
+
+### 11.2 Valid Configuration Tests
+
+| Test case | Result |
+|---|---|
+| Normal chunking configuration | PASS |
+| Zero overlap | PASS |
+| Small supported chunk size | PASS |
+| Valid overlap configuration | PASS |
+
+A chunk size that is too small to accommodate the section prefix is rejected. For example, a chunk size of 1 or 10 was rejected, while sizes of 20, 30, and 50 were accepted in the earlier boundary test.
+
+The number of chunks depends on the input text, chunk size, section prefix, and chunking implementation.
+
+### 11.3 Empty-Input Tests
+
+| Input | Result |
+|---|---|
+| Empty string | PASS |
+| Whitespace-only string | PASS |
+| Newline-only string | PASS |
+
+All three inputs returned an empty list without raising an exception.
+
+### 11.4 Chunk-Overlap Inspection
+
+The overlap inspection generated six chunks for the selected test text using a chunk size of 60 and an overlap setting of 15.
+
+Adjacent chunks appeared to share some text. However, this was an inspection rather than a formal assertion of the exact overlap length.
+
+**Status: Inspection completed; exact overlap consistency not yet formally verified.**
+
+## 12. Combined Regression Evaluation
+
+After the Day 16 text-processing changes, all six existing evaluation scripts were run again.
+
+| No. | Evaluation script | Result |
+|---:|---|---|
+| 1 | `evaluation/test_retrieval_evaluation.py` | PASS |
+| 2 | `evaluation/test_paper_analysis_evaluation.py` | PASS |
+| 3 | `evaluation/test_citation_evaluation.py` | PASS |
+| 4 | `evaluation/test_cross_paper_evaluation.py` | PASS |
+| 5 | `evaluation/test_research_directions_evaluation.py` | PASS |
+| 6 | `evaluation/test_research_assessment_evaluation.py` | PASS |
+
+**Combined regression status: 6/6 scripts passed.**
+
+The final verification output also confirmed:
+
+- Git branch: `main`
+- Local branch synchronized with `origin/main`
+- Latest verified commit: `520a9b7` — `Improve research paper section detection`
+- Working tree: clean
+- No additional code changes required by the final regression run
+
+The tests emitted warnings related to the deprecated `fitz` API and unauthenticated Hugging Face Hub requests. These warnings did not cause the tested scripts to fail.
+
+## 13. Consolidated Evaluation Results
+
+| No. | Module / component | Result |
+|---:|---|---|
+| 1 | PDF processing and text extraction | PASS in the tested workflow |
+| 2 | Text cleaning and section detection | PASS in the tested workflow |
+| 3 | Semantic and hybrid retrieval | PASS |
+| 4 | Research paper analysis | PASS |
+| 5 | Citation analysis | PASS |
+| 6 | Cross-paper analysis | PASS |
+| 7 | Potential Research Directions | PASS |
+| 8 | Research Assessment | PASS |
+| 9 | Text-processing edge cases | PASS for the tested cases |
+| 10 | Combined regression suite | PASS — six scripts |
+
+These results represent functional testing under selected conditions. They should not be interpreted as proof of comprehensive reliability or scientific correctness.
+
+## 14. Limitations of Evaluation
+
+The current evaluation has the following limitations:
+
+1. **Limited test corpus:** The cross-paper test uses two literature PDFs. This is insufficient to establish performance across a broad range of research fields and document types.
+
+2. **Retrieval relevance:** Queries return results, but some retrieved passages are less directly relevant than others. Bibliography content can appear in retrieval results.
+
+3. **Limited quantitative metrics:** Comprehensive measurements such as retrieval precision, recall, ranking quality, and answer faithfulness have not been established by the recorded tests.
+
+4. **Citation extraction accuracy:** The citation test verifies returned fields and reference counts but does not independently verify every reference against its original publication.
+
+5. **AI-generated output quality:** Prompt-structure tests do not establish the factual correctness, completeness, or scientific usefulness of generated analyses.
+
+6. **Potential research directions:** Suggested directions require researcher validation. The evaluation does not establish originality or prove the existence of research gaps.
+
+7. **Research assessment:** The module supports structured reporting assessment and is not a substitute for expert peer review.
+
+8. **Chunk overlap:** The observed chunks suggest overlap, but exact overlap consistency requires a dedicated test.
+
+9. **Test coverage:** Passing the existing evaluation scripts does not guarantee that every possible input, document format, or runtime failure has been tested.
+
+## 15. Future Improvements
+
+The following improvements are recommended based on the recorded observations:
+
+1. Improve retrieval ranking and section-aware relevance.
+2. Reduce irrelevant bibliography content in retrieval results.
+3. Add formal tests for exact chunk-overlap behavior.
+4. Evaluate retrieval using manually labelled relevant passages and suitable ranking metrics.
+5. Validate citation extraction against known reference lists.
+6. Evaluate generated answers for evidence support and factual consistency.
+7. Test with a larger and more diverse research-paper corpus.
+8. Conduct independent researcher evaluation of potential research directions and research-assessment outputs.
+9. Review the deprecated PDF-import API and consider migration to the supported PyMuPDF interface.
+
+These are potential improvements; they should not be described as implemented until the corresponding changes have been made and tested.
+
+## 16. Conclusion
+
+ResearchMate AI has successfully completed the recorded functional tests for document processing, retrieval, research paper analysis, citation analysis, cross-paper analysis, potential research direction generation, and research assessment.
+
+The Day 16 edge-case tests verified the handling of invalid chunking parameters and empty inputs. The six evaluation scripts also passed in the final regression run, and Git reported a clean working tree synchronized with the remote repository.
+
+The results support the functional implementation of the tested workflows. They do not establish perfect retrieval relevance, comprehensive citation accuracy, scientific validity, originality, or the correctness of every AI-generated output.
+
+Further evaluation using larger literature collections, quantitative retrieval metrics, formal overlap assertions, and independent researcher review is required to assess the system's reliability and scientific usefulness more comprehensively.
