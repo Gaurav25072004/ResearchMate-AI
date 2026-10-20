@@ -418,3 +418,80 @@ The Day 16 edge-case tests verified the handling of invalid chunking parameters 
 The results support the functional implementation of the tested workflows. They do not establish perfect retrieval relevance, comprehensive citation accuracy, scientific validity, originality, or the correctness of every AI-generated output.
 
 Further evaluation using larger literature collections, quantitative retrieval metrics, formal overlap assertions, and independent researcher review is required to assess the system's reliability and scientific usefulness more comprehensively.
+
+---
+
+## 17. Day 18 — Retrieval Relevance Evaluation
+
+### 17.1 Objective
+
+Introduce an initial quantitative baseline for retrieval relevance using three queries against the existing 18-page research paper.
+
+The evaluation uses the existing embedding model, FAISS index, and hybrid retrieval function. The top five retrieved chunks are inspected for each query.
+
+### 17.2 Evaluation Configuration
+
+| Parameter | Value |
+|---|---|
+| Research paper | `2506.22026v1.pdf` |
+| Pages | 18 |
+| Chunks | 48 |
+| Queries | 3 |
+| Results per query | 5 |
+| Total retrieved results | 15 |
+| Relevance method | Keyword-based proxy |
+
+### 17.3 Results
+
+| Query | Proxy-relevant results | Precision@5 | Hit@5 |
+|---|---:|---:|---:|
+| Methodology | 4/5 | 0.800 | 1 |
+| Dataset or data | 3/5 | 0.600 | 1 |
+| Main research results | 2/5 | 0.400 | 1 |
+| Overall | 9/15 | 0.600 | 1.000 average |
+
+The mean reciprocal rank (MRR@5) reported by the script was 1.000. This means that at least one chunk matching the proxy criteria appeared at rank 1 for each query. It does not establish that the first result fully answers the query.
+
+### 17.4 Interpretation and Limitations
+
+The initial keyword-proxy evaluation completed successfully. The methodology query had the highest proxy precision, while the main-results query had the lowest.
+
+The relevance heuristic checks for selected words or phrases in retrieved chunks. It can label a passage relevant even when the passage mentions a keyword without directly answering the question. For example, a dataset-related word in a prompt-sensitivity section does not, by itself, establish that the passage adequately describes the dataset.
+
+Consequently:
+
+1. These measurements are preliminary proxy metrics, not human-validated relevance judgments.
+2. The three queries provide only a small sample of retrieval behavior.
+3. Hit@5 measures whether at least one proxy match appears in the top five; it does not measure answer completeness.
+4. MRR@5 reflects the first proxy match, not verified answer relevance.
+5. No conclusion about improved retrieval quality can be drawn without a comparable baseline or manually labelled relevant passages.
+
+### 17.5 Regression Results
+
+The following seven evaluation scripts completed successfully in the recorded Day 18 run:
+
+| Evaluation script | Result |
+|---|---|
+| `test_retrieval_evaluation.py` | PASS |
+| `test_paper_analysis_evaluation.py` | PASS |
+| `test_citation_evaluation.py` | PASS |
+| `test_cross_paper_evaluation.py` | PASS |
+| `test_research_directions_evaluation.py` | PASS |
+| `test_research_assessment_evaluation.py` | PASS |
+| `test_retrieval_relevance_evaluation.py` | PASS |
+
+The scripts emitted the existing PDF API deprecation warning and unauthenticated Hugging Face Hub warning. Neither prevented the tests from completing.
+
+### 17.6 Next Improvements
+
+1. Manually label relevant passages for a larger set of methodology, dataset, and results questions.
+2. Recalculate retrieval metrics against those labels.
+3. Review false-positive keyword matches and improve relevance criteria.
+4. Compare future retrieval changes against the same queries and labels.
+5. Evaluate answer support separately from passage retrieval.
+
+### 17.7 Conclusion
+
+Day 18 added a reproducible retrieval relevance evaluation and recorded an initial keyword-proxy Precision@5 of 0.600, Hit@5 of 1.000, and MRR@5 of 1.000 across three queries.
+
+All seven evaluation scripts passed in the recorded run. The measurements provide a preliminary baseline only; they do not establish scientific correctness, validated relevance, or improved retrieval quality. Further evaluation using manually labelled passages is required.
