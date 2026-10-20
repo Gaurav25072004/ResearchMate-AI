@@ -495,3 +495,66 @@ The scripts emitted the existing PDF API deprecation warning and unauthenticated
 Day 18 added a reproducible retrieval relevance evaluation and recorded an initial keyword-proxy Precision@5 of 0.600, Hit@5 of 1.000, and MRR@5 of 1.000 across three queries.
 
 All seven evaluation scripts passed in the recorded run. The measurements provide a preliminary baseline only; they do not establish scientific correctness, validated relevance, or improved retrieval quality. Further evaluation using manually labelled passages is required.
+
+## 18. Day 19 — Graded Retrieval Relevance Evaluation
+
+### 18.1 Objective
+
+Day 19 extends the initial keyword-proxy retrieval evaluation by introducing graded relevance judgments and Normalized Discounted Cumulative Gain at rank 5 (nDCG@5). The purpose is to evaluate the ordering of retrieved passages using three research-related queries covering methodology, dataset, and main results.
+
+### 18.2 Implementation
+
+The following files were added or updated:
+
+| File | Purpose |
+|---|---|
+| `evaluation/retrieval_relevance_judgments.md` | Stores preliminary relevance ratings for the top five results for each query. |
+| `evaluation/test_ndcg_evaluation.py` | Loads ratings from the Markdown file and calculates nDCG@5. |
+| `evaluation/test_retrieval_relevance_evaluation.py` | Prints retrieved passage previews and calculates keyword-proxy metrics. |
+
+The graded relevance scale is:
+
+- 2: Directly answers the query.
+- 1: Partially answers the query or provides useful supporting evidence.
+- 0: Does not help answer the query.
+
+The nDCG evaluator reads the ratings from the Markdown judgment file, checks that each query has five ratings, and calculates nDCG@5 and the mean across the evaluated queries.
+
+### 18.3 Preliminary Results
+
+| Query | Preliminary relevance ratings | nDCG@5 |
+|---|---|---:|
+| Methodology | 2, 1, 1, 1, 1 | 1.000 |
+| Dataset or data | 1, 2, 1, 1, 0 | 0.838 |
+| Main research results | 2, 2, 1, 1, 2 | 0.969 |
+| Mean | — | 0.936 |
+
+The evaluator compiled and completed successfully. It loaded all three query rating lists from the Markdown judgment file and calculated a mean nDCG@5 of 0.936.
+
+### 18.4 Interpretation and Limitations
+
+These results measure how closely the current rating sequences match their ideal ordering. They do not independently measure the retrieval system's relevance quality because the ratings are preliminary and were initially drafted from short passage previews.
+
+The ratings must be checked against the full retrieved passages before they can be treated as manually verified relevance judgments. Any incorrect ratings should be updated in `evaluation/retrieval_relevance_judgments.md` and the evaluator rerun.
+
+Additional limitations:
+
+1. Only three queries are included.
+2. The current ratings have not yet been fully verified against the complete passages.
+3. The evaluation does not compare retrieval methods or establish improvement over a baseline.
+4. The keyword-proxy metrics recorded for Day 18 remain heuristic measurements and should not be interpreted as human-validated relevance.
+5. No claim about overall retrieval accuracy or scientific correctness can be made from these results.
+
+### 18.5 Validation Status
+
+| Check | Result |
+|---|---|
+| Python compilation of `test_ndcg_evaluation.py` | PASS |
+| Execution of `test_ndcg_evaluation.py` | PASS |
+| Loading ratings from the Markdown file | PASS |
+| Full manual verification of relevance ratings | PENDING |
+| Full regression suite for Day 19 | PENDING |
+
+### 18.6 Conclusion
+
+Day 19 introduced a graded relevance judgment file and an nDCG@5 evaluator that reads the ratings dynamically from Markdown. The preliminary mean nDCG@5 was 0.936 across three queries. This is an initial ranking assessment based on unverified ratings, not proof of retrieval accuracy or improvement. Full passage review, verified relevance judgments, and regression testing remain necessary before finalizing the evaluation.

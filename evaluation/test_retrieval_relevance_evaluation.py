@@ -1,4 +1,5 @@
-﻿from pathlib import Path
+﻿
+from pathlib import Path
 import sys
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -12,27 +13,37 @@ from rag.vector_store import create_faiss_index, hybrid_search
 
 PAPER_PATH = Path(r"D:\My capstone Research papers\2506.22026v1.pdf")
 TOP_K = 5
+PREVIEW_LENGTH = 350
 
 TEST_CASES = [
     {
         "query": "What methodology was used in the study?",
         "terms": [
-            "methodology", "methods", "approach",
-            "experimental setup", "system architecture"
+            "methodology",
+            "methods",
+            "approach",
+            "experimental setup",
+            "system architecture",
         ],
     },
     {
         "query": "What dataset or data was used?",
         "terms": [
-            "dataset", "datasets", "data collection",
-            "benchmark", "corpus"
+            "dataset",
+            "datasets",
+            "data collection",
+            "benchmark",
+            "corpus",
         ],
     },
     {
         "query": "What were the main results of the research?",
         "terms": [
-            "main results", "experimental results",
-            "findings", "accuracy", "performance"
+            "main results",
+            "experimental results",
+            "findings",
+            "accuracy",
+            "performance",
         ],
     },
 ]
@@ -40,35 +51,52 @@ TEST_CASES = [
 
 def main():
     if not PAPER_PATH.exists():
-        raise FileNotFoundError(f"Research paper not found: {PAPER_PATH}")
+        raise FileNotFoundError(
+            f"Research paper not found: {PAPER_PATH}"
+        )
 
     with open(PAPER_PATH, "rb") as pdf_file:
         text, page_count = extract_text_from_pdf(pdf_file)
 
     chunks = split_text_into_chunks(clean_text(text))
+
     if not chunks:
-        raise RuntimeError("No chunks were extracted from the paper.")
+        raise RuntimeError(
+            "No chunks were extracted from the paper."
+        )
 
     model = load_embedding_model()
-    embeddings = model.encode(chunks, show_progress_bar=False)
+    embeddings = model.encode(
+        chunks,
+        show_progress_bar=False,
+    )
     index = create_faiss_index(embeddings)
 
-    total_relevant = 0
+    total_proxy_relevant = 0
     total_retrieved = 0
     query_hits = 0
     reciprocal_ranks = []
 
-    print("=" * 65)
-    print("DAY 18 - RETRIEVAL RELEVANCE EVALUATION")
-    print("=" * 65)
-    print(f"Pages: {page_count} | Chunks: {len(chunks)} | Top K: {TOP_K}")
-    print("Relevance is estimated using section/content keyword proxies.")
-    print("These metrics are not human-validated relevance judgments.")
+    print("=" * 75)
+    print("DAY 19 - RETRIEVAL RELEVANCE INSPECTION")
+    print("=" * 75)
+    print(f"Paper: {PAPER_PATH.name}")
+    print(f"Pages: {page_count}")
+    print(f"Chunks: {len(chunks)}")
+    print(f"Top K: {TOP_K}")
+    print(
+        "\nIMPORTANT: Keyword matches are only proxies. "
+        "Inspect each preview to judge actual relevance."
+    )
 
     for case in TEST_CASES:
         query = case["query"]
         terms = case["terms"]
-        query_embedding = model.encode([query], show_progress_bar=False)[0]
+
+        query_embedding = model.encode(
+            [query],
+            show_progress_bar=False,
+        )[0]
 
         results = hybrid_search(
             index=index,
@@ -78,58 +106,110 @@ def main():
             top_k=TOP_K,
         )
 
+        # Retain the existing keyword-proxy metric for comparison.
         relevant_flags = [
-            any(term in result["chunk"].casefold() for term in terms)
+            any(
+                term in result["chunk"].casefold()
+                for term in terms
+            )
             for result in results
         ]
 
         relevant_count = sum(relevant_flags)
-        total_relevant += relevant_count
-        total_retrieved += len(results)
+        result_count = len(results)
+
+        total_proxy_relevant += relevant_count
+        total_retrieved += result_count
 
         hit = relevant_count > 0
         query_hits += int(hit)
 
         first_relevant_rank = next(
-            (rank for rank, is_relevant in enumerate(relevant_flags, 1)
-             if is_relevant),
+            (
+                rank
+                for rank, is_relevant in enumerate(
+                    relevant_flags, start=1
+                )
+                if is_relevant
+            ),
             None,
         )
+
         reciprocal_ranks.append(
-            1 / first_relevant_rank if first_relevant_rank else 0
+            1 / first_relevant_rank
+            if first_relevant_rank is not None
+            else 0
         )
 
-        precision = relevant_count / len(results) if results else 0
+        precision = (
+            relevant_count / result_count
+            if result_count
+            else 0
+        )
 
-        print(f"\nQuery: {query}")
-        print(f"Retrieved: {len(results)} | Proxy-relevant: {relevant_count}")
-        print(f"Precision@{TOP_K}: {precision:.3f}")
-        print(f"Hit@{TOP_K}: {int(hit)}")
+        print("\n" + "-" * 75)
+        print(f"QUERY: {query}")
+        print(
+            f"Retrieved: {result_count}"
+            f" | Keyword-proxy matches: {relevant_count}"
+        )
+        print(f"Proxy Precision@{TOP_K}: {precision:.3f}")
+        print(f"Proxy Hit@{TOP_K}: {int(hit)}")
+        print("-" * 75)
 
-        for rank, (result, is_relevant) in enumerate(
-            zip(results, relevant_flags), 1
+        for rank, (result, proxy_match) in enumerate(
+            zip(results, relevant_flags),
+            start=1,
         ):
-            heading = result["chunk"].splitlines()[0][:100]
-            print(
-                f"  {rank}. {'PROXY-RELEVANT' if is_relevant else 'UNMATCHED'}"
-                f" | score={result['final_score']:.3f} | {heading}"
+            chunk = result["chunk"]
+            lines = chunk.splitlines()
+            heading = (
+                lines[0].strip()[:120]
+                if lines
+                else "(No heading)"
             )
+            preview = " ".join(chunk.split())[
+                :PREVIEW_LENGTH
+            ]
+
+            print(
+                f"\nRank: {rank}"
+                f" | Proxy: {'MATCH' if proxy_match else 'NO MATCH'}"
+                f" | Score: {result['final_score']:.3f}"
+            )
+            print(f"Section: {heading}")
+            print(f"Preview: {preview}...")
 
     query_count = len(TEST_CASES)
-    overall_precision = (
-        total_relevant / total_retrieved if total_retrieved else 0
-    )
-    hit_at_k = query_hits / query_count
-    mrr = sum(reciprocal_ranks) / query_count
 
-    print("\n" + "=" * 65)
-    print("SUMMARY")
+    overall_precision = (
+        total_proxy_relevant / total_retrieved
+        if total_retrieved
+        else 0
+    )
+    hit_at_k = (
+        query_hits / query_count
+        if query_count
+        else 0
+    )
+    mrr = (
+        sum(reciprocal_ranks) / query_count
+        if query_count
+        else 0
+    )
+
+    print("\n" + "=" * 75)
+    print("SUMMARY — KEYWORD-PROXY METRICS")
     print(f"Precision@{TOP_K}: {overall_precision:.3f}")
     print(f"Hit@{TOP_K}: {hit_at_k:.3f}")
     print(f"MRR@{TOP_K}: {mrr:.3f}")
     print(f"Queries evaluated: {query_count}")
-    print("Evaluation completed. Inspect the matches before interpreting them.")
-    print("=" * 65)
+    print(f"Total results inspected: {total_retrieved}")
+    print(
+        "\nThese are keyword-proxy metrics, not "
+        "human-validated relevance measurements."
+    )
+    print("=" * 75)
 
 
 if __name__ == "__main__":
