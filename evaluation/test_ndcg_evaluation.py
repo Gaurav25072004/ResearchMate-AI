@@ -93,9 +93,9 @@ def main():
     judgments = load_judgments(JUDGMENTS_PATH)
 
     print("=" * 60)
-    print("DAY 19 - nDCG@5 EVALUATION")
+    print("DAY 20 - nDCG@5 EVALUATION")
     print("Ratings loaded from the Markdown judgment file")
-    print("Ratings remain preliminary until manually verified.")
+    print("Ratings were reviewed against the full retrieved passages.")
     print("=" * 60)
 
     scores = []
