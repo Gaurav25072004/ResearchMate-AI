@@ -1,116 +1,136 @@
-
-from pathlib import Path
+import math
 import re
-from math import log2
+from pathlib import Path
 
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-JUDGMENTS_PATH = (
-    PROJECT_ROOT
-    / "evaluation"
+# DAY 21 - nDCG@5 EVALUATION
+# All six queries were reviewed against full retrieved passages.
+
+JUDGMENTS_FILE = (
+    Path(__file__).resolve().parent
     / "retrieval_relevance_judgments.md"
 )
+
 TOP_K = 5
 
 
-def dcg_at_k(relevance_scores, k):
-    """Calculate Discounted Cumulative Gain at rank k."""
-    return sum(
-        (2**score - 1) / log2(rank + 1)
-        for rank, score in enumerate(
-            relevance_scores[:k],
-            start=1,
-        )
-    )
+def calculate_dcg(relevance_scores):
+    """Calculate Discounted Cumulative Gain."""
+    dcg = 0.0
+
+    for rank, relevance in enumerate(relevance_scores, start=1):
+        dcg += (2 ** relevance - 1) / math.log2(rank + 1)
+
+    return dcg
 
 
-def ndcg_at_k(relevance_scores, k):
-    """Calculate normalized DCG using ideal ranking."""
-    actual_dcg = dcg_at_k(relevance_scores, k)
+def calculate_ndcg(relevance_scores):
+    """Calculate Normalized Discounted Cumulative Gain."""
+    dcg = calculate_dcg(relevance_scores)
+
     ideal_scores = sorted(
         relevance_scores,
         reverse=True,
     )
-    ideal_dcg = dcg_at_k(ideal_scores, k)
 
-    return actual_dcg / ideal_dcg if ideal_dcg else 0.0
+    ideal_dcg = calculate_dcg(ideal_scores)
+
+    if ideal_dcg == 0:
+        return 0.0
+
+    return dcg / ideal_dcg
 
 
-def load_judgments(path):
-    """Read relevance ratings from the Markdown tables."""
-    content = path.read_text(encoding="utf-8")
-    judgments = {}
-    current_query = None
+def load_relevance_judgments(file_path):
+    """Load query headings and relevance ratings from Markdown."""
+    content = file_path.read_text(encoding="utf-8")
 
-    for line in content.splitlines():
-        if line.startswith("## Query "):
-            current_query = line.split(":", 1)[-1].strip()
-            judgments[current_query] = []
+    query_sections = re.split(
+        r"(?m)^## Query \d+: ",
+        content,
+    )[1:]
 
-        elif current_query and line.startswith("|"):
-            cells = [
-                cell.strip()
-                for cell in line.strip().strip("|").split("|")
-            ]
+    judgments = []
 
-            # Skip the Markdown table header and separator.
-            if (
-                len(cells) >= 3
-                and cells[0] == "Rank"
-            ):
-                continue
+    for section in query_sections:
+        lines = section.strip().splitlines()
 
-            if (
-                len(cells) >= 3
-                and re.fullmatch(r"\d+", cells[0])
-                and re.fullmatch(r"[012]", cells[2])
-            ):
-                judgments[current_query].append(
-                    int(cells[2])
-                )
+        if not lines:
+            continue
+
+        query = lines[0].strip()
+
+        ratings_match = re.search(
+            r"\*\*Relevance ratings:\*\*\s*`\[([0-2,\s]+)\]`",
+            section,
+        )
+
+        if not ratings_match:
+            ratings_match = re.search(
+                r"\*\*Provisional relevance ratings:\*\*\s*"
+                r"`\[([0-2,\s]+)\]`",
+                section,
+            )
+
+        if not ratings_match:
+            raise ValueError(
+                f"Could not find relevance ratings for query: {query}"
+            )
+
+        ratings = [
+            int(value.strip())
+            for value in ratings_match.group(1).split(",")
+        ]
+
+        if len(ratings) != TOP_K:
+            raise ValueError(
+                f"Expected {TOP_K} ratings for '{query}', "
+                f"but found {len(ratings)}."
+            )
+
+        judgments.append(
+            {
+                "query": query,
+                "ratings": ratings,
+            }
+        )
 
     if not judgments:
         raise ValueError(
-            "No query judgments found in the Markdown file."
+            f"No query judgments found in {file_path}"
         )
-
-    for query, ratings in judgments.items():
-        if len(ratings) != TOP_K:
-            raise ValueError(
-                f"{query}: expected {TOP_K} ratings, "
-                f"found {len(ratings)}."
-            )
 
     return judgments
 
 
 def main():
-    if not JUDGMENTS_PATH.exists():
-        raise FileNotFoundError(
-            f"Judgment file not found: {JUDGMENTS_PATH}"
-        )
-
-    judgments = load_judgments(JUDGMENTS_PATH)
-
     print("=" * 60)
-    print("DAY 20 - nDCG@5 EVALUATION")
-    print("Ratings loaded from the Markdown judgment file")
-    print("Ratings were reviewed against the full retrieved passages.")
+    print("DAY 21 - nDCG@5 EVALUATION")
+    print(
+        "All six queries were reviewed against full retrieved passages."
+    )
     print("=" * 60)
+
+    judgments = load_relevance_judgments(JUDGMENTS_FILE)
 
     scores = []
 
-    for query, ratings in judgments.items():
-        score = ndcg_at_k(ratings, TOP_K)
-        scores.append(score)
+    for judgment in judgments:
+        query = judgment["query"]
+        ratings = judgment["ratings"]
+
+        ndcg_score = calculate_ndcg(ratings)
+        scores.append(ndcg_score)
 
         print(f"\nQuery: {query}")
         print(f"Relevance ratings: {ratings}")
-        print(f"nDCG@{TOP_K}: {score:.3f}")
+        print(f"nDCG@{TOP_K}: {ndcg_score:.3f}")
+
+    mean_ndcg = sum(scores) / len(scores)
 
     print("\n" + "=" * 60)
-    print(f"Queries evaluated: {len(scores)}")
-    print(f"Mean nDCG@{TOP_K}: {sum(scores) / len(scores):.3f}")
+    print(f"Queries evaluated: {len(judgments)}")
+    print(f"Mean nDCG@{TOP_K}: {mean_ndcg:.3f}")
     print(
         "This score measures the ordering of the entered ratings; "
         "it does not independently validate retrieval quality."

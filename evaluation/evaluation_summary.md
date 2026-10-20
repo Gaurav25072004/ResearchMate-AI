@@ -558,3 +558,54 @@ Additional limitations:
 ### 18.6 Conclusion
 
 Day 19 introduced a graded relevance judgment file and an nDCG@5 evaluator that reads the ratings dynamically from Markdown. The preliminary mean nDCG@5 was 0.936 across three queries. This is an initial ranking assessment based on unverified ratings, not proof of retrieval accuracy or improvement. Full passage review, verified relevance judgments, and regression testing remain necessary before finalizing the evaluation.
+
+## 19. Day 21 — Expanded Retrieval Relevance Evaluation
+
+### 19.1 Objective
+
+Day 21 expands the graded retrieval relevance evaluation from three to six queries. The additional queries cover study limitations, research contributions, and system evaluation.
+
+The evaluation uses one research paper and assesses the ranking of the top five retrieved passages for each query using Normalized Discounted Cumulative Gain at rank 5 (nDCG@5).
+
+### 19.2 Results
+
+| Query | Relevance ratings, ranks 1–5 | nDCG@5 |
+|---|---|---:|
+| Methodology | 2, 1, 1, 1, 1 | 1.000 |
+| Dataset or data | 1, 2, 1, 0, 0 | 0.821 |
+| Main research results | 2, 2, 1, 1, 2 | 0.969 |
+| Study limitations | 1, 2, 1, 0, 1 | 0.829 |
+| Research contributions | 2, 1, 2, 1, 1 | 0.958 |
+| System evaluation | 2, 1, 2, 1, 2 | 0.932 |
+| **Mean across six queries** | — | **0.918** |
+
+The nDCG evaluator completed successfully, loaded six query rating lists from the Markdown judgment file, and calculated a mean nDCG@5 of 0.918.
+
+### 19.3 Interpretation and Limitations
+
+The original three queries were reviewed against their full retrieved passages on Day 20. The three additional query ratings remain provisional until their full retrieved passages have been reviewed.
+
+The mean nDCG@5 decreased from 0.930 for the original three-query set to 0.918 for the expanded six-query set. This difference reflects the addition of queries and does not, by itself, demonstrate a regression in retrieval-system performance.
+
+Limitations include:
+
+1. The evaluation covers one research paper and six queries, which is a limited sample.
+2. The three additional relevance judgments require full-passage verification.
+3. nDCG@5 measures ranking against the entered relevance judgments; it does not independently validate those judgments.
+4. The evaluation does not compare retrieval methods or establish improvement over a baseline.
+5. The results do not establish answer completeness, factual correctness, scientific validity, or research originality.
+
+### 19.4 Validation Status
+
+| Check | Result |
+|---|---|
+| nDCG evaluator execution for six queries | PASS |
+| Markdown rating extraction | PASS |
+| Five ratings loaded per query | PASS |
+| Original three queries reviewed against full passages | COMPLETE |
+| Full-passage review of three additional queries | PENDING |
+| Full regression suite after Day 21 changes | PENDING |
+
+### 19.5 Conclusion
+
+Day 21 expanded the graded retrieval evaluation to six queries and recorded a mean nDCG@5 of 0.918. This is a preliminary ranking assessment conditional on the entered relevance ratings. Further full-passage review and broader evaluation across multiple papers and queries are needed before drawing wider conclusions about retrieval quality.

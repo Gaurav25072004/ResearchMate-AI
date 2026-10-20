@@ -45,6 +45,34 @@ QUERIES = [
             "performance",
         ],
     },
+    {
+        "query": "What limitations of the study are discussed?",
+        "terms": [
+            "limitations",
+            "limitation",
+            "threats to validity",
+            "future work",
+        ],
+    },
+    {
+        "query": "What are the main contributions of the research?",
+        "terms": [
+            "contribution",
+            "contributions",
+            "we propose",
+            "we introduce",
+        ],
+    },
+    {
+        "query": "How was the proposed system evaluated?",
+        "terms": [
+            "evaluation",
+            "evaluated",
+            "experiments",
+            "baseline",
+            "accuracy",
+        ],
+    },
 ]
 
 
@@ -56,7 +84,8 @@ def load_paper(pdf_path):
             "Update PDF_PATH to point to your research paper."
         )
 
-    # extract_text_from_pdf returns (full_text, page_count).
+    # extract_text_from_pdf expects a file-like object
+    # and returns (full_text, page_count).
     with pdf_path.open("rb") as pdf_file:
         text, page_count = extract_text_from_pdf(pdf_file)
 
@@ -83,7 +112,7 @@ def calculate_keyword_proxy(chunk, terms):
 
 def main():
     print("=" * 75)
-    print("DAY 20 - FULL-PASSAGE RETRIEVAL RELEVANCE INSPECTION")
+    print("DAY 21 - EXPANDED RETRIEVAL RELEVANCE EVALUATION")
     print("=" * 75)
 
     text, page_count, chunks = load_paper(PDF_PATH)
@@ -92,6 +121,7 @@ def main():
     print(f"Pages: {page_count}")
     print(f"Chunks: {len(chunks)}")
     print(f"Top K: {TOP_K}")
+    print(f"Queries: {len(QUERIES)}")
     print()
     print(
         "IMPORTANT: Keyword matches are only proxies. "
@@ -111,15 +141,15 @@ def main():
     all_results = 0
     first_match_ranks = []
 
-    for query_data in QUERIES:
+    for query_number, query_data in enumerate(QUERIES, start=1):
         query = query_data["query"]
         terms = query_data["terms"]
 
-        print("\n" + "-" * 75)
-        print(f"QUERY: {query}")
-        print("-" * 75)
+        print("\n" + "=" * 75)
+        print(f"QUERY {query_number}/{len(QUERIES)}: {query}")
+        print("=" * 75)
 
-        # Use the same loaded model to embed the query.
+        # Use the same loaded embedding model for the query.
         query_embedding = model.encode(
             [query],
             show_progress_bar=False,
@@ -154,12 +184,14 @@ def main():
 
             print(
                 f"\nRank: {rank} | "
-                f"Proxy: {'MATCH' if is_match else 'NO MATCH'} | "
+                f"Keyword proxy: "
+                f"{'MATCH' if is_match else 'NO MATCH'} | "
                 f"Score: {result.get('final_score', 0.0):.3f}"
             )
 
             lines = chunk.splitlines()
             section = lines[0].strip() if lines else "Unknown"
+
             print(f"Section: {section}")
             print("\nFull retrieved passage:")
             print(chunk)
@@ -177,12 +209,16 @@ def main():
         print(f"Proxy Hit@{len(results)}: {hit}")
 
     precision_at_k = (
-        all_proxy_matches / all_results if all_results else 0.0
+        all_proxy_matches / all_results
+        if all_results
+        else 0.0
     )
 
     hit_at_k = (
         sum(rank is not None for rank in first_match_ranks)
         / len(QUERIES)
+        if QUERIES
+        else 0.0
     )
 
     reciprocal_ranks = [
@@ -207,6 +243,10 @@ def main():
     print(
         "These are keyword-proxy metrics, not human-validated "
         "relevance measurements."
+    )
+    print(
+        "Manually review the full passages before assigning "
+        "relevance ratings or calculating nDCG@5."
     )
     print("=" * 75)
 
